@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Xup · 主窗口</title><link rel="stylesheet" href="mac.css"></head>
+<body>
+<div class="nav"><b>Xup 原型</b><a class="on" href="main.html">主窗口</a><a href="menubar.html">菜单栏</a><a href="settings.html">设置</a><a href="states.html">状态</a><a href="picker.html">选择软件</a><a href="app-source.html">应用来源</a><span class="sp"></span><button id="theme">切换到深色</button></div>
+
+<h1 class="page">主窗口 — NavigationSplitView + Table + VSplitView 日志</h1>
+<p class="lead">窗口 920×640。当前选中"全部"分区，展示所有行状态；日志面板展开，正在更新 iina（2/3）。悬停任意图标可见 SF Symbol 名称。</p>
+
+<div class="window" style="width:920px">
+  <div class="titlebar">
+    <div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div>
+    <span class="tb icon" title="toggleSidebar"><i class="sf" data-sf="sidebar.left"></i></span>
+    <div class="ttl"><b>Xup</b><span>全部 · 8 个可更新</span></div>
+    <div class="toolbar">
+      <span class="tb disabled" title="⌘R · 更新进行中禁用"><i class="sf" data-sf="arrow.clockwise"></i>检查更新</span>
+      <span class="tb disabled" title="⌘U"><i class="sf" data-sf="arrow.down.circle"></i>更新选中 (2)</span>
+      <span class="tb disabled" title="⇧⌘U"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</span>
+      <span class="tb destructive" title="停止"><i class="sf" data-sf="stop.circle"></i>停止</span>
+      <span class="tb disabled" title="⇧⌘N · 更新进行中禁用"><i class="sf" data-sf="checklist"></i>选择软件…</span>
+      <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+      <span class="tb icon on" title="⌥⌘L 日志"><i class="sf" data-sf="terminal"></i></span>
+    </div>
+  </div>
+  <div class="split">
+    <div class="sidebar">
+      <div class="srow sel"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span><span class="badge orange">8</span></div>
+      <div class="sect">来源</div>
+      <div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="badge orange">1</span></div>
+      <div class="srow dim" title="未检测到 uv"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div>
+      <div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="sparkles"></i><span class="name">Skills</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="puzzlepiece.extension"></i><span class="name">插件</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span><span class="badge orange">1</span></div>
+    </div>
+    <div class="content">
+      <div class="table">
+        <table>
+          <colgroup><col style="width:30px"><col><col style="width:110px"><col style="width:110px"><col style="width:200px"><col style="width:120px"></colgroup>
+          <thead><tr><th></th><th>名称</th><th>已安装</th><th>最新</th><th class="sorted">状态</th><th></th></tr></thead>
+          <tbody>
+            <tr class="updating"><td><span class="cb dis"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="macwindow"></i><div class="t"><b>IINA</b><small>Sparkle · iina.io</small></div></div></td>
+              <td class="ver">1.3.9</td><td class="ver new">1.4.0</td>
+              <td><div class="st accent"><span class="spinner sm accent"></span>更新中<span class="msg">· 下载中 48%</span></div></td>
+              <td><div class="row-actions"><span class="sw on" title="更新后重启"></span></div></td></tr>
+            <tr><td><span class="cb on"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><b>node</b><small>formula</small></div></div></td>
+              <td class="ver">22.1.0</td><td class="ver new">22.3.0</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新</div></td>
+              <td><div class="row-actions"><span class="btn hover show">更新</span></div></td></tr>
+            <tr class="sel"><td><span class="cb on"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="cpu"></i><div class="t"><b>Claude Code</b><small>~/.npm-global/bin/claude</small></div></div></td>
+              <td class="ver">1.0.3</td><td class="ver new">1.0.5</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新</div></td>
+              <td><div class="row-actions"><span class="btn hover show">更新</span></div></td></tr>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="shippingbox"></i><div class="t"><b>typescript</b><small>npm -g</small></div></div></td>
+              <td class="ver">5.5.4</td><td class="ver new">5.6.2</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新</div></td>
+              <td><div class="row-actions"><span class="btn hover">更新</span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><b>python@3.12</b><small>formula</small></div></div></td>
+              <td class="ver">3.12.4</td><td class="ver">3.12.7</td>
+              <td><div class="st sec" title="已 pin，跳过"><i class="sf" data-sf="pin.fill"></i>可更新<span class="msg">· 已 pin，跳过</span></div></td>
+              <td><div class="row-actions"><i class="sf sec" data-sf="info.circle"></i></div></td></tr>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><b>visual-studio-code</b><small>cask</small></div></div></td>
+              <td class="ver">1.94.0</td><td class="ver">1.94.0</td>
+              <td><div class="st red" title="Error: Permission denied @ rb_sysopen - /Applications/Visual Studio Code.app"><i class="sf" data-sf="xmark.circle.fill"></i>失败<span class="msg">· Permission denied @ rb_sysopen…</span></div></td>
+              <td><div class="row-actions"><span class="btn hover show"><i class="sf" data-sf="arrow.counterclockwise"></i>重试</span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="cpu"></i><div class="t"><b>Codex CLI</b><small>~/.npm-global/bin/codex</small></div></div></td>
+              <td class="ver">0.42.0</td><td class="ver">0.44.1</td>
+              <td><div class="st sec" title="未知安装方式，无更新命令"><i class="sf" data-sf="arrow.up.circle"></i>可更新<span class="msg">· 未知安装方式，无更新命令</span></div></td>
+              <td><div class="row-actions"><i class="sf sec" data-sf="info.circle"></i></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="macwindow"></i><div class="t"><b>Raycast</b><small>/Applications/Raycast.app</small></div></div></td>
+              <td class="ver">1.84.2</td><td class="ver">—</td>
+              <td><div class="st sec" title="无法识别更新来源（非 brew cask / Sparkle / App Store）"><i class="sf" data-sf="questionmark.circle"></i>未知<span class="msg">· 无法识别更新来源（非 brew cask / Sparkle…</span></div></td>
+              <td><div class="row-actions"><span class="sw on"></span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="cpu"></i><div class="t"><b>Gemini CLI</b><small>~/.npm-global/bin/gemini</small></div></div></td>
+              <td class="ver">0.3.1</td><td class="ver">—</td>
+              <td><div class="st sec"><span class="spinner sm"></span>检查中</div></td>
+              <td></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><b>ripgrep</b><small>formula</small></div></div></td>
+              <td class="ver">14.1.1</td><td class="ver">14.1.1</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.seal.fill"></i>已更新</div></td>
+              <td></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="shippingbox"></i><div class="t"><b>pnpm</b><small>npm -g</small></div></div></td>
+              <td class="ver">9.12.0</td><td class="ver">9.12.0</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="macwindow"></i><div class="t"><b>Xcode</b><small>App Store</small></div></div></td>
+              <td class="ver">16.0</td><td class="ver">16.0</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td><div class="row-actions"><span class="sw"></span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="cpu"></i><div class="t"><b>OpenCode</b><small>~/.local/bin/opencode</small></div></div></td>
+              <td class="ver">0.5.8</td><td class="ver">0.5.8</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="statusbar">
+        <span>共 13 项 · 8 个可更新 · <span class="red">1 个失败</span></span>
+        <span class="sp"></span>
+        <span class="prog"><i style="width:55%"></i></span><span>正在更新 IINA (2/3) · 下载中 48%</span>
+        <span class="sp"></span>
+        <span title="下一次自动检查：15:12">上次检查 今天 09:12</span>
+      </div>
+      <div class="grip"></div>
+      <div class="log">
+        <div class="loghead"><i class="sf" data-sf="terminal"></i>日志<span class="sp"></span>
+          <span class="ib" title="仅显示错误"><i class="sf" data-sf="exclamationmark.triangle"></i></span>
+          <span class="ib" title="复制全部"><i class="sf" data-sf="doc.on.doc"></i></span>
+          <span class="ib" title="清空"><i class="sf" data-sf="trash"></i></span></div>
+        <div class="logbody">
+          <div class="ll cmd"><span class="tm">09:14:02</span><span class="src">[brew]</span><span class="tx">$ brew upgrade ripgrep</span></div>
+          <div class="ll"><span class="tm">09:14:03</span><span class="src">[brew]</span><span class="tx">==> Upgrading ripgrep 14.1.0 -> 14.1.1</span></div>
+          <div class="ll"><span class="tm">09:14:09</span><span class="src">[brew]</span><span class="tx">🍺  /opt/homebrew/Cellar/ripgrep/14.1.1: 14 files, 6.1MB</span></div>
+          <div class="ll cmd"><span class="tm">09:14:10</span><span class="src">[brew]</span><span class="tx">$ brew upgrade --cask visual-studio-code</span></div>
+          <div class="ll err"><span class="tm">09:14:14</span><span class="src">[brew]</span><span class="tx">Error: Permission denied @ rb_sysopen - /Applications/Visual Studio Code.app/Contents/Info.plist</span></div>
+          <div class="ll err"><span class="tm">09:14:14</span><span class="src">[xup]</span><span class="tx">visual-studio-code 更新失败（退出码 1）</span></div>
+          <div class="ll cmd"><span class="tm">09:14:15</span><span class="src">[app]</span><span class="tx">$ 下载 https://dl-portal.iina.io/IINA.v1.4.0.dmg</span></div>
+          <div class="ll"><span class="tm">09:14:21</span><span class="src">[app]</span><span class="tx">下载中 23.1 MB / 48.2 MB (48%)</span></div>
+        </div>
+        <span class="jump" title="arrow.down.to.line.compact"><i class="sf" data-sf="arrow.down.to.line.compact"></i></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h1 class="page">分区视图 — "应用"，日志折叠</h1>
+<p class="lead">侧栏选中"应用"后工具栏出现"添加应用…"；名称列不再显示来源图标，改为应用图标；每行右侧为"更新后重启"开关。日志折叠时仅保留状态栏。</p>
+
+<div class="window" style="width:920px">
+  <div class="titlebar">
+    <div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div>
+    <span class="tb icon"><i class="sf" data-sf="sidebar.left"></i></span>
+    <div class="ttl"><b>Xup</b><span>应用 · 1 个可更新</span></div>
+    <div class="toolbar">
+      <span class="tb"><i class="sf" data-sf="arrow.clockwise"></i>检查更新</span>
+      <span class="tb disabled"><i class="sf" data-sf="arrow.down.circle"></i>更新选中</span>
+      <span class="tb"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</span>
+      <span class="tb" title="⌘N"><i class="sf" data-sf="plus"></i>添加应用…</span>
+      <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+      <span class="tb icon"><i class="sf" data-sf="terminal"></i></span>
+    </div>
+  </div>
+  <div class="split" style="height:420px">
+    <div class="sidebar">
+      <div class="srow"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span><span class="badge orange">8</span></div>
+      <div class="sect">来源</div>
+      <div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="badge orange">1</span></div>
+      <div class="srow dim"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div>
+      <div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="sparkles"></i><span class="name">Skills</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="puzzlepiece.extension"></i><span class="name">插件</span><span class="badge orange">1</span></div>
+      <div class="srow sel"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span><span class="badge orange">1</span></div>
+    </div>
+    <div class="content">
+      <div class="table">
+        <table>
+          <colgroup><col style="width:30px"><col><col style="width:100px"><col style="width:100px"><col style="width:190px"><col style="width:150px"></colgroup>
+          <thead><tr><th></th><th>名称</th><th>已安装</th><th>最新</th><th class="sorted">状态</th><th style="text-align:right">更新后重启</th></tr></thead>
+          <tbody>
+            <tr><td><span class="cb on"></span></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#444,#111)">II</span><div class="t"><b>IINA</b><small>Sparkle · iina.io</small></div></div></td>
+              <td class="ver">1.3.9</td><td class="ver new">1.4.0</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新</div></td>
+              <td><div class="row-actions"><span class="btn hover show">更新</span><span class="sw on"></span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#f97,#e33)">R</span><div class="t"><b>Raycast</b><small>/Applications/Raycast.app</small></div></div></td>
+              <td class="ver">1.84.2</td><td class="ver">—</td>
+              <td><div class="st sec"><i class="sf" data-sf="questionmark.circle"></i>未知<span class="msg">· 无法识别更新来源</span></div></td>
+              <td><div class="row-actions"><span class="sw on"></span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#4af,#06c)">Ch</span><div class="t"><b>Google Chrome</b><small>Homebrew cask google-chrome</small></div></div></td>
+              <td class="ver">130.0.6723</td><td class="ver">130.0.6723</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td><div class="row-actions"><span class="sw on"></span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#6cf,#16a)">X</span><div class="t"><b>Xcode</b><small>App Store</small></div></div></td>
+              <td class="ver">16.0</td><td class="ver">16.0</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td><div class="row-actions"><span class="sw"></span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#8e8,#283)">S</span><div class="t"><b>Spotify</b><small>App Store</small></div></div></td>
+              <td class="ver">1.2.47</td><td class="ver">—</td>
+              <td><div class="st sec" title="未安装 mas（brew install mas）"><i class="sf" data-sf="questionmark.circle"></i>未知<span class="msg">· 未安装 mas（brew install mas）· 可在 App Store 中更新</span></div></td>
+              <td><div class="row-actions"><span class="sw on"></span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="statusbar">
+        <span>共 5 项 · 1 个可更新</span><span class="sp"></span><span>上次检查 今天 09:12</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h1 class="page">分区视图 — "Skills"，日志折叠</h1>
+<p class="lead">侧栏选中"Skills"：数据来自 <code>~/.agents/.skill-lock.json</code>；detail 显示 source（GitHub 仓库/目录）；版本列为本地 <code>updatedAt</code> 与远端最新提交日期（更新 = 该目录在 GitHub 上有新提交）。更新命令 <code>npx skills update &lt;name&gt; -g -y</code>。工具栏"选择软件…"替代"添加应用…"。</p>
+
+<div class="window" style="width:920px">
+  <div class="titlebar">
+    <div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div>
+    <span class="tb icon"><i class="sf" data-sf="sidebar.left"></i></span>
+    <div class="ttl"><b>Xup</b><span>Skills · 2 个可更新</span></div>
+    <div class="toolbar">
+      <span class="tb"><i class="sf" data-sf="arrow.clockwise"></i>检查更新</span>
+      <span class="tb"><i class="sf" data-sf="arrow.down.circle"></i>更新选中 (1)</span>
+      <span class="tb"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</span>
+      <span class="tb" title="⇧⌘N"><i class="sf" data-sf="checklist"></i>选择软件…</span>
+      <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+      <span class="tb icon"><i class="sf" data-sf="terminal"></i></span>
+    </div>
+  </div>
+  <div class="split" style="height:420px">
+    <div class="sidebar">
+      <div class="srow"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span><span class="badge orange">8</span></div>
+      <div class="sect">来源</div>
+      <div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="badge orange">1</span></div>
+      <div class="srow dim"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div>
+      <div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="badge orange">1</span></div>
+      <div class="srow sel"><i class="sf" data-sf="sparkles"></i><span class="name">Skills</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="puzzlepiece.extension"></i><span class="name">插件</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span><span class="badge orange">1</span></div>
+    </div>
+    <div class="content">
+      <div class="table">
+        <table>
+          <colgroup><col style="width:30px"><col><col style="width:100px"><col style="width:100px"><col style="width:210px"><col style="width:90px"></colgroup>
+          <thead><tr><th></th><th>名称</th><th>本地更新于</th><th>远端提交</th><th class="sorted">状态</th><th></th></tr></thead>
+          <tbody>
+            <tr class="sel"><td><span class="cb on"></span></td>
+              <td><div class="nm"><div class="t"><b>ui-ux-pro-max</b><small>nextlevelbuilder/ui-ux-pro-max-skill</small></div></div></td>
+              <td class="ver">10-21</td><td class="ver new">11-02</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新<span class="msg">· 远端有 3 个新提交</span></div></td>
+              <td><div class="row-actions"><span class="btn hover show">更新</span></div></td></tr>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><div class="t"><b>browser-tools</b><small>vercel-labs/agent-skills</small></div></div></td>
+              <td class="ver">10-28</td><td class="ver new">11-03</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新<span class="msg">· 远端有 1 个新提交</span></div></td>
+              <td><div class="row-actions"><span class="btn hover">更新</span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><div class="t"><b>distill-memory</b><small>nowledge/mem-skills</small></div></div></td>
+              <td class="ver">10-28</td><td class="ver">10-28</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><div class="t"><b>find-skills</b><small>vercel-labs/skills</small></div></div></td>
+              <td class="ver">10-30</td><td class="ver">10-30</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.seal.fill"></i>已更新</div></td>
+              <td></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><div class="t"><b>frontend-design-pro</b><small>local · ~/.agents/skills/frontend-design-pro</small></div></div></td>
+              <td class="ver">10-12</td><td class="ver">—</td>
+              <td><div class="st sec" title="本地安装，没有 GitHub source，无法检查更新"><i class="sf" data-sf="questionmark.circle"></i>未知<span class="msg">· 本地安装，无 GitHub source</span></div></td>
+              <td><div class="row-actions"><i class="sf sec" data-sf="info.circle"></i></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="statusbar">
+        <span>共 5 项 · 2 个可更新 · 跟踪 5 / 12 个已安装 skill</span><span class="sp"></span><span title="下一次自动检查：15:12">上次检查 今天 09:12</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="note">Skills 的"版本"没有语义化版本号，因此两列表头改为"本地更新于 / 远端提交"，内容为短日期（同年省略年份，跨年显示 <code>2025-12-30</code>）；有新提交时远端列加粗并在状态里追加"远端有 N 个新提交"。GitHub API 限流时整列显示 <code>—</code>，状态为"未知 · GitHub 请求限流，稍后重试"。</p>
+
+<p class="note">Xup 为纯菜单栏应用（LSUIElement）：主窗口只能从菜单栏面板"打开 Xup"进入，关闭窗口后应用继续在菜单栏运行。Sparkle 应用更新阶段文案：下载中 n% → 校验中 → 解压中 → 替换中 → 重启中。<br>右键菜单（contextMenu）：更新 · 在 Finder 中显示 · 复制名称 · 复制版本 · 取消关注（非应用分区，支持 ⌘Z）· <span class="red">移除</span>（仅应用分区）。双击可更新行等同"更新"。表头可排序，但默认排序为：可更新 → 失败 → 未知 → 更新中 → 已更新 → 最新。</p>
+
+<script src="sf.js"></script>
+</body></html>

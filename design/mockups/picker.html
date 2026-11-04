@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Xup · 选择软件</title><link rel="stylesheet" href="mac.css">
+<style>.sec-title{color:#fff;font-size:15px;font-weight:600;margin:40px 0 14px;text-shadow:0 1px 2px rgba(0,0,0,.3)}.lbl{color:#fff;font-size:12px;font-weight:600;margin:0 0 8px;opacity:.9}</style></head>
+<body>
+<div class="nav"><b>Xup 原型</b><a href="main.html">主窗口</a><a href="menubar.html">菜单栏</a><a href="settings.html">设置</a><a href="states.html">状态</a><a class="on" href="picker.html">选择软件</a><a href="app-source.html">应用来源</a><span class="sp"></span><button id="theme">切换到深色</button></div>
+
+<h1 class="page">选择软件… Sheet — 关注列表（DESIGN.md §13）</h1>
+<p class="lead">Sheet 560×480，附着在主窗口标题栏下。顶部：来源分段控件 + 搜索框；中部：本机已安装清单，每行 checkbox · 名称 · detail · 已安装版本；底部：全选 / 清空 / 已选 N 项 与 取消 / 完成。只有被勾选的条目才会被检查与更新。</p>
+
+<div class="sec-title">1 · 首次启动：主窗口（欢迎态）自动弹出 Sheet，正在读取 Homebrew 已安装列表</div>
+<div class="stage" style="width:920px;height:640px">
+  <div class="window" style="width:920px">
+    <div class="titlebar">
+      <div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div>
+      <span class="tb icon"><i class="sf" data-sf="sidebar.left"></i></span>
+      <div class="ttl"><b>Xup</b><span>全部</span></div>
+      <div class="toolbar">
+        <span class="tb disabled"><i class="sf" data-sf="arrow.clockwise"></i>检查更新</span>
+        <span class="tb disabled"><i class="sf" data-sf="arrow.down.circle"></i>更新选中</span>
+        <span class="tb disabled"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</span>
+        <span class="tb disabled"><i class="sf" data-sf="checklist"></i>选择软件…</span>
+        <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+        <span class="tb icon"><i class="sf" data-sf="terminal"></i></span>
+      </div>
+    </div>
+    <div class="split">
+      <div class="sidebar">
+        <div class="srow sel"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span></div>
+        <div class="sect">来源</div>
+        <div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span></div>
+        <div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span></div>
+        <div class="srow dim" title="未检测到 uv"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div>
+        <div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span></div>
+        <div class="srow"><i class="sf" data-sf="sparkles"></i><span class="name">Skills</span></div>
+        <div class="srow"><i class="sf" data-sf="puzzlepiece.extension"></i><span class="name">插件</span></div>
+        <div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span></div>
+      </div>
+      <div class="content">
+        <div class="empty"><i class="sf xl" data-sf="arrow.up.circle"></i><h3>欢迎使用 Xup</h3><p>先选择要让 Xup 跟踪的软件。Xup 只会检查和更新你勾选的条目。</p><div class="acts"><span class="btn lg prominent"><i class="sf" data-sf="checklist"></i>选择软件…</span><span class="link">添加应用…</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <div class="shd">
+      <div><b>选择要跟踪的软件</b><div class="sub">只有勾选的条目会被检查和更新。之后可随时在工具栏"选择软件…"中修改。</div></div>
+      <div class="row">
+        <div class="seg">
+          <span class="on">Homebrew</span>
+          <span>npm 全局</span>
+          <span class="dim" title="未检测到 uv">uv tool</span>
+          <span>Agents</span>
+          <span>Skills</span>
+          <span>插件</span>
+        </div>
+        <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+      </div>
+    </div>
+    <div class="centerload">
+      <span class="spinner lg"></span>
+      <span>正在读取 Homebrew 已安装列表…</span>
+      <span class="ter mono caption">$ brew list --versions</span>
+    </div>
+    <div class="sft">
+      <span class="btn plain dis">全选</span><span class="btn plain dis">清空</span>
+      <span class="cnt">已选 0 项</span>
+      <span class="sp"></span>
+      <span class="btn lg">取消</span><span class="btn lg prominent dis">完成</span>
+    </div>
+  </div>
+</div>
+
+<div class="sec-title">2 · 已加载并有勾选：npm 全局（搜索为空），底部显示"已选 3 项"</div>
+<div class="grid">
+  <div>
+    <p class="lbl">2.1 已加载 · 有勾选</p>
+    <div class="sheet">
+      <div class="shd">
+        <div><b>选择要跟踪的软件</b><div class="sub">只有勾选的条目会被检查和更新。</div></div>
+        <div class="row">
+          <div class="seg">
+            <span>Homebrew</span>
+            <span class="on">npm 全局</span>
+            <span class="dim" title="未检测到 uv">uv tool</span>
+            <span>Agents</span>
+            <span>Skills</span>
+            <span>插件</span>
+          </div>
+          <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+        </div>
+      </div>
+      <div class="list">
+        <div class="prow2"><span class="cb on"></span><div class="t"><b>@anthropic-ai/claude-code</b><small>npm -g · ~/.npm-global/lib</small></div><span class="tag" title="同时被 Agents 来源跟踪">Agents</span><span class="ver">1.0.3</span></div>
+        <div class="prow2"><span class="cb on"></span><div class="t"><b>typescript</b><small>npm -g</small></div><span class="ver">5.5.4</span></div>
+        <div class="prow2"><span class="cb on"></span><div class="t"><b>pnpm</b><small>npm -g</small></div><span class="ver">9.12.0</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>corepack</b><small>npm -g · 随 Node 安装</small></div><span class="ver">0.29.3</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>npm</b><small>npm -g · 随 Node 安装</small></div><span class="ver">10.8.2</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>vercel</b><small>npm -g</small></div><span class="ver">37.4.2</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>skills</b><small>npm -g</small></div><span class="ver">1.2.0</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>@openai/codex</b><small>npm -g</small></div><span class="tag" title="同时被 Agents 来源跟踪">Agents</span><span class="ver">0.42.0</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>serve</b><small>npm -g</small></div><span class="ver">14.2.3</span></div>
+      </div>
+      <div class="sft">
+        <span class="btn plain">全选</span><span class="btn plain">清空</span>
+        <span class="cnt">已选 3 项 · 共 9 项</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">完成</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="lbl">2.2 Skills 分段 · 搜索"mem"过滤后</p>
+    <div class="sheet" style="height:380px">
+      <div class="shd">
+        <div><b>选择要跟踪的软件</b><div class="sub">只有勾选的条目会被检查和更新。</div></div>
+        <div class="row">
+          <div class="seg">
+            <span>Homebrew</span>
+            <span>npm 全局</span>
+            <span class="dim">uv tool</span>
+            <span>Agents</span>
+            <span class="on">Skills</span>
+            <span>插件</span>
+          </div>
+          <span class="search" style="color:var(--primary)"><i class="sf" data-sf="magnifyingglass"></i>mem<span class="sp" style="flex:1"></span><i class="sf ter" data-sf="xmark.circle" title="清除"></i></span>
+        </div>
+      </div>
+      <div class="list">
+        <div class="prow2"><span class="cb on"></span><div class="t"><b>distill-memory</b><small>nowledge/mem-skills</small></div><span class="ver">更新于 10-28</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>search-memory</b><small>nowledge/mem-skills</small></div><span class="ver">更新于 10-28</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>read-working-memory</b><small>nowledge/mem-skills</small></div><span class="ver">更新于 10-28</span></div>
+      </div>
+      <div class="sft">
+        <span class="btn plain">全选</span><span class="btn plain">清空</span>
+        <span class="cnt">已选 4 项 · 共 12 项（显示 3 项）</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">完成</span>
+      </div>
+    </div>
+    <p class="note" style="max-width:560px">全选 / 清空只作用于<b>当前过滤结果</b>；"已选 N 项"统计的是当前分段的全部勾选数，不受搜索影响。切换分段不丢失其他分段的勾选，"完成"一次写入全部来源。</p>
+  </div>
+
+  <div>
+    <p class="lbl">2.3 插件分段 · 含 claude.ai 同步的只读项</p>
+    <div class="sheet" style="height:380px">
+      <div class="shd">
+        <div><b>选择要跟踪的软件</b><div class="sub">只有勾选的条目会被检查和更新。</div></div>
+        <div class="row">
+          <div class="seg">
+            <span>Homebrew</span>
+            <span>npm 全局</span>
+            <span class="dim">uv tool</span>
+            <span>Agents</span>
+            <span>Skills</span>
+            <span class="on">插件</span>
+          </div>
+          <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+        </div>
+      </div>
+      <div class="list">
+        <div class="prow2"><span class="cb on"></span><div class="t"><b>ui-ux-pro-max</b><small>Claude · claude-plugins-official</small></div><span class="ver">0.7.32</span></div>
+        <div class="prow2"><span class="cb on"></span><div class="t"><b>frontend-design</b><small>Claude · claude-plugins-official</small></div><span class="ver">1.2.0</span></div>
+        <div class="prow2 dim" title="由 claude.ai 同步，Xup 不能更新"><span class="cb dis"></span><div class="t"><b>anthropic-skills</b><small>Claude · claude.ai</small></div><span class="tag"><i class="sf" data-sf="icloud"></i>&nbsp;由 claude.ai 同步</span><span class="ver">—</span></div>
+        <div class="prow2"><span class="cb"></span><div class="t"><b>security-review</b><small>Codex · openai-plugins</small></div><span class="ver mono">a1f3c9e</span></div>
+      </div>
+      <div class="sft">
+        <span class="btn plain">全选</span><span class="btn plain">清空</span>
+        <span class="cnt">已选 2 项 · 共 3 项可选</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">完成</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="lbl">2.4 分段为空（uv tool 已安装但没有任何 tool）</p>
+    <div class="sheet" style="height:380px">
+      <div class="shd">
+        <div><b>选择要跟踪的软件</b><div class="sub">只有勾选的条目会被检查和更新。</div></div>
+        <div class="row">
+          <div class="seg">
+            <span>Homebrew</span>
+            <span>npm 全局</span>
+            <span class="on">uv tool</span>
+            <span>Agents</span>
+            <span>Skills</span>
+            <span>插件</span>
+          </div>
+          <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+        </div>
+      </div>
+      <div class="list" style="display:flex">
+        <div class="empty"><i class="sf xl" data-sf="bolt"></i><h3>没有找到已安装的 uv tool</h3><p>用 <span class="mono">uv tool install</span> 安装后，点击"重新读取"。</p><div class="acts"><span class="btn lg"><i class="sf" data-sf="arrow.clockwise"></i>重新读取</span></div></div>
+      </div>
+      <div class="sft">
+        <span class="btn plain dis">全选</span><span class="btn plain dis">清空</span>
+        <span class="cnt">已选 0 项</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">完成</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec-title">3 · 关注集合为空时的分区空状态（主窗口内容区，§6.9）</div>
+<div class="window" style="width:920px">
+  <div class="titlebar">
+    <div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div>
+    <span class="tb icon"><i class="sf" data-sf="sidebar.left"></i></span>
+    <div class="ttl"><b>Xup</b><span>插件</span></div>
+    <div class="toolbar">
+      <span class="tb disabled"><i class="sf" data-sf="arrow.clockwise"></i>检查更新</span>
+      <span class="tb disabled"><i class="sf" data-sf="arrow.down.circle"></i>更新选中</span>
+      <span class="tb disabled"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</span>
+      <span class="tb" title="⇧⌘N"><i class="sf" data-sf="checklist"></i>选择软件…</span>
+      <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+      <span class="tb icon"><i class="sf" data-sf="terminal"></i></span>
+    </div>
+  </div>
+  <div class="split" style="height:360px">
+    <div class="sidebar">
+      <div class="srow"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span><span class="badge orange">6</span></div>
+      <div class="sect">来源</div>
+      <div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="badge orange">1</span></div>
+      <div class="srow dim"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div>
+      <div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="sparkles"></i><span class="name">Skills</span><span class="badge orange">2</span></div>
+      <div class="srow sel"><i class="sf" data-sf="puzzlepiece.extension"></i><span class="name">插件</span></div>
+      <div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span></div>
+    </div>
+    <div class="content">
+      <div class="empty"><i class="sf xl" data-sf="puzzlepiece.extension"></i><h3>还没有选择要跟踪的软件</h3><p>从本机已安装的 Claude Code / Codex 插件中勾选要让 Xup 检查更新的条目。</p><div class="acts"><span class="btn lg prominent"><i class="sf" data-sf="checklist"></i>选择软件…</span></div></div>
+      <div class="statusbar"><span>未跟踪任何插件</span><span class="sp"></span><span>上次检查 今天 09:12</span></div>
+    </div>
+  </div>
+</div>
+
+<p class="note">关注集合持久化在 <code>~/Library/Application Support/Xup/watchlist.json</code>；"应用"来源不出现在分段控件中，它的关注集合就是"添加应用…"选出的 App 列表。表格行右键菜单新增"取消关注"（<code>eye.slash</code>），立即从关注集合移除并从列表消失，支持 ⌘Z。</p>
+
+<script src="sf.js"></script>
+</body></html>

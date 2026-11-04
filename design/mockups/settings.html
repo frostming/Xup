@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Xup · 设置</title><link rel="stylesheet" href="mac.css">
+<style>.three{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;justify-content:center}.three .settings{margin:0}</style></head>
+<body>
+<div class="nav"><b>Xup 原型</b><a href="main.html">主窗口</a><a href="menubar.html">菜单栏</a><a class="on" href="settings.html">设置</a><a href="states.html">状态</a><a href="picker.html">选择软件</a><a href="app-source.html">应用来源</a><span class="sp"></span><button id="theme">切换到深色</button></div>
+
+<h1 class="page">设置 — Settings scene, TabView，宽 520，Form(.grouped)</h1>
+<p class="lead">三个 Tab：通用 / Agents / 应用。</p>
+
+<div class="three">
+<!-- 通用 -->
+<div class="window settings">
+  <div class="titlebar">
+    <div class="tbtop"><div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div><b>通用</b></div>
+    <div class="tabs">
+      <div class="tab on"><i class="sf" data-sf="gearshape"></i>通用</div>
+      <div class="tab"><i class="sf" data-sf="cpu"></i>Agents</div>
+      <div class="tab"><i class="sf" data-sf="macwindow"></i>应用</div>
+    </div>
+  </div>
+  <div class="form">
+    <div class="gwrap"><div class="ghd">检查</div>
+      <div class="group">
+        <div class="frow"><div class="lbl">检查间隔</div><span class="popup">6 小时 <span class="ar">▲<br>▼</span></span></div>
+        <div class="frow" style="padding-left:28px"><div class="lbl sub">自定义：每</div><span class="stepper"><span class="tf">90</span><span class="pm">▲▼</span></span><span class="sub">分钟</span><span class="annot">仅选"自定义…"时出现</span></div>
+        <div class="frow"><div class="lbl">发现更新时通知</div><span class="sw on"></span></div>
+        <div class="frow"><div class="lbl">发现更新时自动更新<small>默认关闭：定时检查只会通知你。开启后发现更新会直接执行，应用分区仍遵循"更新后重启"开关。</small></div><span class="sw"></span></div>
+      </div>
+    </div>
+    <div class="gwrap"><div class="ghd">Homebrew</div>
+      <div class="group">
+        <div class="frow"><div class="lbl">包含自动更新的 cask (--greedy)<small>把自带更新机制的应用（如 Chrome）也列为可更新。</small></div><span class="sw on"></span></div>
+      </div>
+    </div>
+    <div class="gwrap"><div class="ghd">显示</div>
+      <div class="group">
+        <div class="frow"><div class="lbl">显示已是最新的条目</div><span class="sw on"></span></div>
+        <div class="frow"><div class="lbl">登录时启动</div><span class="sw on"></span></div>
+      </div>
+    </div>
+    <div class="gwrap">
+      <div class="group">
+        <div class="frow"><div class="lbl">版本</div><span class="sub">1.0 (12)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Agents -->
+<div class="window settings">
+  <div class="titlebar">
+    <div class="tbtop"><div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div><b>Agents</b></div>
+    <div class="tabs">
+      <div class="tab"><i class="sf" data-sf="gearshape"></i>通用</div>
+      <div class="tab on"><i class="sf" data-sf="cpu"></i>Agents</div>
+      <div class="tab"><i class="sf" data-sf="macwindow"></i>应用</div>
+    </div>
+  </div>
+  <div class="form">
+    <p class="callout sec" style="margin:0 2px;line-height:1.5">Xup 内置了下列 CLI agent 的检测规则。编辑 <span class="mono">agents.json</span> 可以增删 agent、修改版本来源或更新命令；保存后点"重新加载"生效。</p>
+    <div class="group">
+      <table class="mini-table">
+        <thead><tr><th>名称</th><th>二进制</th><th>npm 包</th><th>更新命令</th></tr></thead>
+        <tbody>
+          <tr><td>Claude Code</td><td class="mono">claude</td><td class="mono">@anthropic-ai/claude-code</td><td class="mono">claude update</td></tr>
+          <tr><td>Codex CLI</td><td class="mono">codex</td><td class="mono">@openai/codex</td><td class="mono sec">— <span class="tag">仅检测版本</span></td></tr>
+          <tr><td>Gemini CLI</td><td class="mono">gemini</td><td class="mono">@google/gemini-cli</td><td class="mono sec">— <span class="tag">仅检测版本</span></td></tr>
+          <tr><td>OpenCode</td><td class="mono">opencode</td><td class="mono">opencode-ai</td><td class="mono">opencode upgrade</td></tr>
+          <tr><td>Amp</td><td class="mono">amp</td><td class="mono">@sourcegraph/amp</td><td class="mono">amp update</td></tr>
+          <tr><td>GitHub Copilot CLI</td><td class="mono">copilot</td><td class="mono">@github/copilot</td><td class="mono sec">— <span class="tag">仅检测版本</span></td></tr>
+          <tr><td>Cursor Agent</td><td class="mono">cursor-agent</td><td class="mono sec">—</td><td class="mono">cursor-agent update</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="btn lg"><i class="sf" data-sf="folder"></i>在 Finder 中显示</span>
+      <span class="btn lg"><i class="sf" data-sf="square.and.pencil"></i>用默认编辑器打开</span>
+      <span class="btn lg"><i class="sf" data-sf="arrow.clockwise"></i>重新加载</span>
+      <span style="flex:1"></span>
+      <span class="btn lg red plain">恢复默认…</span>
+    </div>
+    <div class="foot mono">~/Library/Application Support/Xup/agents.json</div>
+    <div class="foot">没有更新命令的 agent 只会显示版本对比（通过 npm registry 获取最新版）；可在 agents.json 中为它补充 <span class="mono">updateCommand</span>。</div>
+  </div>
+</div>
+
+<!-- 应用 -->
+<div class="window settings">
+  <div class="titlebar">
+    <div class="tbtop"><div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div><b>应用</b></div>
+    <div class="tabs">
+      <div class="tab"><i class="sf" data-sf="gearshape"></i>通用</div>
+      <div class="tab"><i class="sf" data-sf="cpu"></i>Agents</div>
+      <div class="tab on"><i class="sf" data-sf="macwindow"></i>应用</div>
+    </div>
+  </div>
+  <div class="form">
+    <div class="gwrap"><div class="ghd">跟踪的应用</div>
+      <div class="group">
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#444,#111)">II</span><div class="lbl">IINA<small class="mono">/Applications/IINA.app</small></div><span class="tag">Sparkle</span><span class="sw on" title="更新后重启"></span></div>
+        <div class="frow" style="background:var(--selection)"><span class="appicon" style="background:linear-gradient(#f97,#e33)">R</span><div class="lbl">Raycast<small class="mono">/Applications/Raycast.app</small></div><span class="tag">未知</span><span class="sw on"></span></div>
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#4af,#06c)">Ch</span><div class="lbl">Google Chrome<small class="mono">/Applications/Google Chrome.app</small></div><span class="tag">Homebrew cask</span><span class="sw on"></span></div>
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#6cf,#16a)">X</span><div class="lbl">Xcode<small class="mono">/Applications/Xcode.app</small></div><span class="tag">App Store</span><span class="sw"></span></div>
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#8e8,#283)">S</span><div class="lbl">Spotify<small class="mono">/Applications/Spotify.app</small></div><span class="tag">App Store</span><span class="sw on"></span></div>
+        <div class="pmbar"><span><i class="sf" data-sf="plus"></i></span><span><i class="sf" data-sf="minus"></i></span><span style="flex:1;border:0;justify-content:flex-end;padding-right:10px;font-size:11px;width:auto">最右列：更新后重启</span></div>
+      </div>
+    </div>
+    <div class="foot">Xup 会用 Homebrew、应用自带的 Sparkle appcast 或 mas 来更新这些应用；无法识别来源的应用只会显示版本。移除可用 ⌘Z 撤销。</div>
+  </div>
+</div>
+</div>
+
+<script src="sf.js"></script>
+</body></html>

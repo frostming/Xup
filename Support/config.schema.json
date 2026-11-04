@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fming/Xup/blob/main/Support/config.schema.json",
+  "title": "Xup config",
+  "description": "Xup 的全部配置（单一事实来源）。文件位于 ~/Library/Application Support/Xup/config.json；App 运行时会监听并热加载（约 0.5 秒）。Xup settings: the single source of truth, hot-reloaded by the running app.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "指向本 schema 的相对路径（App 自动写入）。Path to this schema, written by the app."
+    },
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "配置格式版本，目前固定为 1。Config format version (currently 1)."
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "定时检查相关设置。Scheduled check settings.",
+      "properties": {
+        "intervalMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 360,
+          "description": "定时检查间隔（分钟），0 表示关闭定时检查；界面最小 5。Minutes between scheduled checks; 0 disables."
+        },
+        "notify": {
+          "type": "boolean",
+          "default": true,
+          "description": "发现更新时发送系统通知。Post a notification when updates are found."
+        },
+        "autoUpdate": {
+          "type": "boolean",
+          "default": false,
+          "description": "定时检查发现更新后自动执行更新（可能退出正在使用的应用）。Automatically install updates found by scheduled checks."
+        }
+      }
+    },
+    "homebrew": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Homebrew 来源设置。Homebrew provider settings.",
+      "properties": {
+        "greedy": {
+          "type": "boolean",
+          "default": false,
+          "description": "brew outdated/upgrade 加 --greedy，把自带更新机制的 cask 也列为可更新。Pass --greedy to include auto-updating casks."
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "界面与系统集成。UI and system integration.",
+      "properties": {
+        "showUpToDate": {
+          "type": "boolean",
+          "default": false,
+          "description": "列表中显示已是最新的条目。Show up-to-date items in lists."
+        },
+        "launchAtLogin": {
+          "type": "boolean",
+          "default": false,
+          "description": "登录时启动 Xup（仅打包为 .app 时生效）。Launch Xup at login (app bundle only)."
+        }
+      }
+    },
+    "electron": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "electron-updater 应用的下载策略。Download policy for electron-updater apps.",
+      "properties": {
+        "deltaDownload": {
+          "type": "boolean",
+          "default": true,
+          "description": "使用 blockmap 增量下载（只下载变化的块）。Use blockmap delta downloads."
+        },
+        "keepVersionsPerApp": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1,
+          "description": "每个应用在缓存中保留的旧版本安装包数量（供增量下载复用）。Old installer versions kept per app for delta reuse."
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "agent / CLI 相关的安全边界。Safety switches for agents using the xup CLI.",
+      "properties": {
+        "allowUpdates": {
+          "type": "boolean",
+          "default": false,
+          "description": "为 true 时 `xup update` 不再要求 --yes。When true, `xup update` does not require --yes."
+        }
+      }
+    },
+    "tracked": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "关注列表：每个来源只检查/更新这里列出的条目（应用见 apps）。Watch lists per provider; only listed items are checked/updated.",
+      "properties": {
+        "homebrew": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Homebrew formula / cask 的 token，如 \"node\"、\"iina\"。Homebrew tokens."
+        },
+        "npm": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "npm 全局包名，如 \"typescript\"、\"@openai/codex\"。Global npm package names."
+        },
+        "uv": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "uv tool 名，如 \"nox\"。uv tool names."
+        },
+        "agent": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "agent 可执行名（agents.json 中的 binary），如 \"claude\"、\"codex\"。Agent binaries."
+        },
+        "skill": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Vercel skills CLI 安装的 skill 名。Skill names from ~/.agents/.skill-lock.json."
+        },
+        "plugin": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "插件键：\"claude/<name@marketplace>\" 或 \"codex/<name@marketplace>\"。Plugin keys."
+        }
+      }
+    },
+    "apps": {
+      "type": "array",
+      "description": "受管应用列表。Managed .app bundles.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "\\.app$",
+            "description": "应用包的绝对路径，如 /Applications/IINA.app。Absolute path to the .app bundle."
+          },
+          "restartAfterUpdate": {
+            "type": "boolean",
+            "default": true,
+            "description": "更新完成后重新启动该应用。Relaunch the app after updating."
+          },
+          "source": {
+            "description": "手动指定的更新来源；null 或省略表示自动识别（Homebrew cask > Sparkle > electron-updater > App Store）。Manual update source; null = auto-detect.",
+            "oneOf": [
+              { "type": "null" },
+              { "$ref": "#/$defs/githubReleases" },
+              { "$ref": "#/$defs/tauri" },
+              { "$ref": "#/$defs/electronYML" },
+              { "$ref": "#/$defs/appcast" }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "githubReleases": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "repo"],
+      "description": "GitHub Releases 最新 Release。Latest GitHub release.",
+      "properties": {
+        "type": { "const": "githubReleases" },
+        "repo": {
+          "type": "string",
+          "pattern": "^[\\w.-]+/[\\w.-]+$",
+          "description": "owner/repo"
+        },
+        "assetPattern": {
+          "type": ["string", "null"],
+          "description": "资源文件名通配（fnmatch），如 \"*arm64*.dmg\"；省略时自动选择匹配本机架构的 .dmg/.zip。Asset name glob."
+        }
+      }
+    },
+    "tauri": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "url"],
+      "description": "Tauri 更新器 JSON。Tauri updater JSON endpoint.",
+      "properties": {
+        "type": { "const": "tauri" },
+        "url": { "type": "string", "format": "uri", "description": "完整 JSON 地址。Full URL of the updater JSON." }
+      }
+    },
+    "electronYML": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "url"],
+      "description": "electron-updater 的 latest-mac.yml。electron-updater feed.",
+      "properties": {
+        "type": { "const": "electronYML" },
+        "url": { "type": "string", "format": "uri", "description": "latest-mac.yml 的完整 URL。Full URL of latest-mac.yml." }
+      }
+    },
+    "appcast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "url"],
+      "description": "Sparkle appcast。Sparkle appcast feed.",
+      "properties": {
+        "type": { "const": "appcast" },
+        "url": { "type": "string", "format": "uri", "description": "appcast.xml 的完整 URL。Full URL of the appcast." }
+      }
+    }
+  }
+}

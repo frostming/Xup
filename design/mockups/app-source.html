@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Xup · 应用更新来源</title><link rel="stylesheet" href="mac.css">
+<style>.sec-title{color:#fff;font-size:15px;font-weight:600;margin:40px 0 14px;text-shadow:0 1px 2px rgba(0,0,0,.3)}.cap{color:#fff;font-size:12px;font-weight:600;margin:0 0 8px;opacity:.9}.grid>div{max-width:440px}</style></head>
+<body>
+<div class="nav"><b>Xup 原型</b><a href="main.html">主窗口</a><a href="menubar.html">菜单栏</a><a href="settings.html">设置</a><a href="states.html">状态</a><a href="picker.html">选择软件</a><a class="on" href="app-source.html">应用来源</a><span class="sp"></span><button id="theme">切换到深色</button></div>
+
+<h1 class="page">应用更新来源 — 自动识别与手动配置（DESIGN.md §16）</h1>
+<p class="lead">自动识别新增 electron-updater（读 <code>Contents/Resources/app-update.yml</code>）；识别不了的应用可以右键"配置更新来源…"手动指定 GitHub Releases / Tauri 更新 JSON / electron-updater latest-mac.yml / Sparkle appcast；既识别不了也没配置的应用，状态改为灰色"由应用自更新"，操作列提供"启动应用"。</p>
+
+<div class="sec-title">1 · "应用"分区表格：五种来源各一行（含右键菜单）</div>
+<p class="note" style="margin-top:-6px">来源优先级：手动配置 › Homebrew cask › Sparkle › electron-updater › App Store › 自更新。detail 文案见 §16.2。Kaze 行被右键，菜单新增"启动应用"与"配置更新来源…"；自更新行不显示"更新后重启"开关（Xup 不替它更新）。</p>
+
+<div class="window" style="width:920px;position:relative">
+  <div class="titlebar">
+    <div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div>
+    <span class="tb icon"><i class="sf" data-sf="sidebar.left"></i></span>
+    <div class="ttl"><b>Xup</b><span>应用 · 2 个可更新</span></div>
+    <div class="toolbar">
+      <span class="tb"><i class="sf" data-sf="arrow.clockwise"></i>检查更新</span>
+      <span class="tb"><i class="sf" data-sf="arrow.down.circle"></i>更新选中 (1)</span>
+      <span class="tb"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</span>
+      <span class="tb" title="⌘N"><i class="sf" data-sf="plus"></i>添加应用…</span>
+      <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+      <span class="tb icon"><i class="sf" data-sf="terminal"></i></span>
+    </div>
+  </div>
+  <div class="split" style="height:440px">
+    <div class="sidebar">
+      <div class="srow"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span><span class="badge orange">9</span></div>
+      <div class="sect">来源</div>
+      <div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="badge orange">1</span></div>
+      <div class="srow dim" title="未检测到 uv"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div>
+      <div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="sparkles"></i><span class="name">Skills</span><span class="badge orange">2</span></div>
+      <div class="srow"><i class="sf" data-sf="puzzlepiece.extension"></i><span class="name">插件</span><span class="badge orange">1</span></div>
+      <div class="srow sel"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span><span class="badge orange">2</span></div>
+    </div>
+    <div class="content">
+      <div class="table">
+        <table>
+          <colgroup><col style="width:30px"><col><col style="width:90px"><col style="width:90px"><col style="width:196px"><col style="width:112px"></colgroup>
+          <thead><tr><th></th><th>名称</th><th>已安装</th><th>最新</th><th class="sorted">状态</th><th style="text-align:right">更新后重启</th></tr></thead>
+          <tbody>
+            <tr><td><span class="cb on"></span></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#444,#111)">II</span><div class="t"><b>IINA</b><small>Sparkle · iina.io</small></div></div></td>
+              <td class="ver">1.3.9</td><td class="ver new">1.4.0</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新</div></td>
+              <td><div class="row-actions"><span class="btn hover show">更新</span><span class="sw on"></span></div></td></tr>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#7b61ff,#3b2fb8)">A</span><div class="t"><b>Alma</b><small>electron-updater · updates.alma.now</small></div></div></td>
+              <td class="ver">0.9.4</td><td class="ver new">0.9.6</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新</div></td>
+              <td><div class="row-actions"><span class="btn hover">更新</span><span class="sw on"></span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#ffb347,#e2651b)">N</span><div class="t"><b>Nowledge Mem</b><small>自定义 · GitHub nowledge-co/mem</small></div></div></td>
+              <td class="ver">1.4.2</td><td class="ver">1.4.2</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td><div class="row-actions"><span class="sw on"></span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#4af,#06c)">Ch</span><div class="t"><b>Google Chrome</b><small>Homebrew cask google-chrome</small></div></div></td>
+              <td class="ver">130.0.6723</td><td class="ver">130.0.6723</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td><div class="row-actions"><span class="sw on"></span></div></td></tr>
+            <tr class="sel"><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#5ad,#157)">K</span><div class="t"><b>Kaze</b><small>/Applications/Kaze.app</small></div></div></td>
+              <td class="ver">0.3.1</td><td class="ver">—</td>
+              <td><div class="st sec" title="Xup 无法识别更新来源，也未手动配置。在应用内检查更新，或右键配置更新来源"><i class="sf" data-sf="arrow.triangle.2.circlepath"></i>由应用自更新<span class="msg">· 在应用内检查更新，或右键配置更新来源</span></div></td>
+              <td><div class="row-actions"><span class="btn hover show" title="启动 Kaze，让它自己检查更新；若已在运行则置前"><i class="sf" data-sf="play.fill"></i>启动应用</span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#333,#000)">m</span><div class="t"><b>magpie</b><small>/Applications/magpie.app</small></div></div></td>
+              <td class="ver">2.1.0</td><td class="ver">—</td>
+              <td><div class="st sec" title="在应用内检查更新，或右键配置更新来源"><i class="sf" data-sf="arrow.triangle.2.circlepath"></i>由应用自更新<span class="msg">· 在应用内检查更新，或右键配置更新来源</span></div></td>
+              <td><div class="row-actions"><span class="btn hover"><i class="sf" data-sf="play.fill"></i>启动应用</span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><span class="appicon" style="background:linear-gradient(#6cf,#16a)">X</span><div class="t"><b>Xcode</b><small>App Store</small></div></div></td>
+              <td class="ver">16.0</td><td class="ver">16.0</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td><div class="row-actions"><span class="sw"></span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="statusbar">
+        <span>共 7 项 · 2 个可更新 · 2 个由应用自更新</span><span class="sp"></span><span title="下一次自动检查：15:12">上次检查 今天 09:12</span>
+      </div>
+    </div>
+  </div>
+  <!-- 右键菜单：Kaze 行 -->
+  <div class="ctx" style="left:600px;top:290px">
+    <div class="mitem dis"><i class="sf" data-sf="arrow.down.circle"></i>更新</div>
+    <div class="mitem"><i class="sf" data-sf="play.circle"></i>启动应用</div>
+    <div class="mitem hl"><i class="sf" data-sf="slider.horizontal.3"></i>配置更新来源…</div>
+    <hr>
+    <div class="mitem"><i class="sf" data-sf="folder"></i>在 Finder 中显示</div>
+    <div class="mitem"><i class="sf" data-sf="doc.on.doc"></i>复制名称</div>
+    <div class="mitem"><i class="sf" data-sf="doc.on.doc"></i>复制版本</div>
+    <hr>
+    <div class="mitem red"><i class="sf" data-sf="trash"></i>移除</div>
+  </div>
+</div>
+
+<div class="sec-title">2 · 配置更新来源 Sheet（440 宽）三态</div>
+<p class="note" style="margin-top:-6px">来源类型为弹出式 Picker（4 项）；类型切换后下方字段随之变化，已填内容按类型分别保留直到关闭。"测试"会真实拉取一次，并显示识别到的最新版本与将下载的资源文件；保存不强制要求测试成功，但字段必须通过本地校验。保存后立即对该应用执行一次检查。</p>
+
+<div class="grid">
+  <div>
+    <p class="cap">2.1 GitHub Releases · 填写中（仓库已通过校验，尚未测试）</p>
+    <div class="sheet cfg">
+      <div class="apphd">
+        <span class="appicon" style="background:linear-gradient(#ffb347,#e2651b)">N</span>
+        <div class="t"><b>配置 Nowledge Mem 的更新来源</b><small>/Applications/Nowledge Mem.app · 已安装 1.3.0</small></div>
+        <span class="tag" title="Xup 自动识别的结果">自动识别：未识别</span>
+      </div>
+      <div class="fields">
+        <div class="frm"><span class="lb">来源类型</span><div class="ct"><div class="inline"><span class="popup">GitHub Releases <span class="ar">▲<br>▼</span></span></div>
+          <div class="help">从仓库的最新 Release 中读取版本（tag）并下载资源文件。</div></div></div>
+        <div class="frm"><span class="lb">仓库</span><div class="ct"><span class="tf focus">nowledge-co/mem<span class="caret"></span></span>
+          <div class="help">格式 <code>owner/repo</code>，也可直接粘贴仓库 URL。</div></div></div>
+        <div class="frm"><span class="lb">资源文件匹配</span><div class="ct"><span class="tf"><span class="ph">*arm64*.dmg（可选）</span></span>
+          <div class="help">通配符匹配 Release 资源文件名。留空时自动选择与本机架构匹配的 <code>.dmg</code> / <code>.zip</code>。</div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="cbrow"><span class="cb"></span>包含预发布版本</div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="inline"><span class="btn lg">测试</span><span class="caption sec">拉取一次，显示识别到的最新版本</span></div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="tres idle"><i class="sf" data-sf="info.circle"></i><div class="b">尚未测试。保存前建议测试一次，确认 Xup 能读到版本与资源文件。</div></div></div></div>
+      </div>
+      <div class="sft">
+        <span class="btn plain red dis" title="仅已有配置时可用">移除配置</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">保存</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="cap">2.2 测试成功：显示最新版本、匹配到的资源文件与和已安装版本的对比</p>
+    <div class="sheet cfg">
+      <div class="apphd">
+        <span class="appicon" style="background:linear-gradient(#ffb347,#e2651b)">N</span>
+        <div class="t"><b>配置 Nowledge Mem 的更新来源</b><small>/Applications/Nowledge Mem.app · 已安装 1.3.0</small></div>
+        <span class="tag">自动识别：未识别</span>
+      </div>
+      <div class="fields">
+        <div class="frm"><span class="lb">来源类型</span><div class="ct"><div class="inline"><span class="popup">GitHub Releases <span class="ar">▲<br>▼</span></span></div>
+          <div class="help">从仓库的最新 Release 中读取版本（tag）并下载资源文件。</div></div></div>
+        <div class="frm"><span class="lb">仓库</span><div class="ct"><span class="tf">nowledge-co/mem</span></div></div>
+        <div class="frm"><span class="lb">资源文件匹配</span><div class="ct"><span class="tf">*arm64*.dmg</span>
+          <div class="help">通配符匹配 Release 资源文件名。留空时自动选择与本机架构匹配的 <code>.dmg</code> / <code>.zip</code>。</div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="cbrow"><span class="cb"></span>包含预发布版本</div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="inline"><span class="btn lg">再次测试</span><span class="caption sec">刚刚 · 用时 0.8 秒</span></div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="tres ok"><i class="sf" data-sf="checkmark.circle.fill"></i><div class="b"><b>最新版本 1.4.2</b>（tag <code>v1.4.2</code>，2026-10-30）· 已安装 1.3.0 → <span class="orange">可更新</span><small title="Nowledge-Mem-1.4.2-arm64.dmg">资源文件 Nowledge-Mem-1.4.2-arm64.dmg · 84.3 MB · 1 / 6 个匹配</small></div></div></div></div>
+      </div>
+      <div class="sft">
+        <span class="btn plain red dis">移除配置</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">保存</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="cap">2.3 测试失败：资源匹配规则无结果（字段标红，保存仍可用但不推荐）</p>
+    <div class="sheet cfg">
+      <div class="apphd">
+        <span class="appicon" style="background:linear-gradient(#ffb347,#e2651b)">N</span>
+        <div class="t"><b>配置 Nowledge Mem 的更新来源</b><small>/Applications/Nowledge Mem.app · 已安装 1.3.0</small></div>
+        <span class="tag">自动识别：未识别</span>
+      </div>
+      <div class="fields">
+        <div class="frm"><span class="lb">来源类型</span><div class="ct"><div class="inline"><span class="popup">GitHub Releases <span class="ar">▲<br>▼</span></span></div>
+          <div class="help">从仓库的最新 Release 中读取版本（tag）并下载资源文件。</div></div></div>
+        <div class="frm"><span class="lb">仓库</span><div class="ct"><span class="tf">nowledge-co/mem</span></div></div>
+        <div class="frm"><span class="lb">资源文件匹配</span><div class="ct"><span class="tf invalid">*x64*.pkg</span>
+          <div class="help red">没有资源文件与此规则匹配。</div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="cbrow"><span class="cb"></span>包含预发布版本</div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="inline"><span class="btn lg">再次测试</span><span class="caption sec">刚刚 · 用时 0.7 秒</span></div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="tres err"><i class="sf" data-sf="xmark.circle.fill"></i><div class="b"><b>未找到匹配的资源文件</b>（v1.4.2 共 6 个，0 个匹配 <code>*x64*.pkg</code>）<small title="Nowledge-Mem-1.4.2-arm64.dmg, Nowledge-Mem-1.4.2-x64.dmg, Nowledge-Mem-1.4.2-arm64-mac.zip, …">可用：Nowledge-Mem-1.4.2-arm64.dmg · Nowledge-Mem-1.4.2-x64.dmg · …-arm64-mac.zip …</small></div></div></div></div>
+      </div>
+      <div class="sft">
+        <span class="btn plain red dis">移除配置</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">保存</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="cap">2.4 补充：URL 类来源（electron-updater latest-mac.yml）· 测试中 · 已有配置（"移除配置"可用）</p>
+    <div class="sheet cfg">
+      <div class="apphd">
+        <span class="appicon" style="background:linear-gradient(#5ad,#157)">K</span>
+        <div class="t"><b>配置 Kaze 的更新来源</b><small>/Applications/Kaze.app · 已安装 0.3.1</small></div>
+        <span class="tag">自动识别：未识别</span>
+      </div>
+      <div class="fields">
+        <div class="frm"><span class="lb">来源类型</span><div class="ct"><div class="inline"><span class="popup">electron-updater (latest-mac.yml) <span class="ar">▲<br>▼</span></span></div>
+          <div class="help">读取 <code>latest-mac.yml</code> 的 <code>version</code> 与 <code>files</code>，按本机架构选择文件并校验 sha512。</div></div></div>
+        <div class="frm"><span class="lb">URL</span><div class="ct"><span class="tf"><i class="sf" data-sf="link"></i>https://updates.kaze.app/latest-mac.yml</span>
+          <div class="help">必须是 <code>https://</code>；填目录 URL 时自动补 <code>latest-mac.yml</code>。</div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="inline"><span class="btn lg dis">测试</span><span class="caption sec">正在获取…</span></div></div></div>
+        <div class="frm"><span class="lb"></span><div class="ct"><div class="tres"><span class="spinner sm"></span><div class="b">正在获取 updates.kaze.app…<small class="mono">GET https://updates.kaze.app/latest-mac.yml</small></div></div></div></div>
+      </div>
+      <div class="sft">
+        <span class="btn plain red">移除配置</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent dis">保存</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec-title">3 · 设置 › 应用：每行显示来源标签，点击整行（或右侧 ›）打开同一个 Sheet</div>
+<div class="window settings">
+  <div class="titlebar">
+    <div class="tbtop"><div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div><b>应用</b></div>
+    <div class="tabs">
+      <div class="tab"><i class="sf" data-sf="gearshape"></i>通用</div>
+      <div class="tab"><i class="sf" data-sf="cpu"></i>Agents</div>
+      <div class="tab on"><i class="sf" data-sf="macwindow"></i>应用</div>
+    </div>
+  </div>
+  <div class="form">
+    <div class="gwrap"><div class="ghd">跟踪的应用</div>
+      <div class="group">
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#444,#111)">II</span><div class="lbl">IINA<small class="mono">/Applications/IINA.app</small></div><span class="tag src">Sparkle</span><span class="sw on" title="更新后重启"></span><i class="sf chev" data-sf="chevron.right"></i></div>
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#7b61ff,#3b2fb8)">A</span><div class="lbl">Alma<small class="mono">/Applications/Alma.app</small></div><span class="tag src">electron-updater</span><span class="sw on"></span><i class="sf chev" data-sf="chevron.right"></i></div>
+        <div class="frow hov"><span class="appicon" style="background:linear-gradient(#ffb347,#e2651b)">N</span><div class="lbl">Nowledge Mem<small class="mono">/Applications/Nowledge Mem.app</small></div><span class="tag src custom" title="手动配置：GitHub nowledge-co/mem"><i class="sf" data-sf="slider.horizontal.3"></i>自定义 · GitHub</span><span class="sw on"></span><i class="sf chev" data-sf="chevron.right"></i></div>
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#4af,#06c)">Ch</span><div class="lbl">Google Chrome<small class="mono">/Applications/Google Chrome.app</small></div><span class="tag src">Homebrew cask</span><span class="sw on"></span><i class="sf chev" data-sf="chevron.right"></i></div>
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#5ad,#157)">K</span><div class="lbl">Kaze<small class="mono">/Applications/Kaze.app</small></div><span class="tag src self" title="无法识别且未配置：点击配置更新来源"><i class="sf" data-sf="arrow.triangle.2.circlepath"></i>自更新</span><span class="sw dis" title="自更新应用不适用"></span><i class="sf chev" data-sf="chevron.right"></i></div>
+        <div class="frow"><span class="appicon" style="background:linear-gradient(#6cf,#16a)">X</span><div class="lbl">Xcode<small class="mono">/Applications/Xcode.app</small></div><span class="tag src">App Store</span><span class="sw"></span><i class="sf chev" data-sf="chevron.right"></i></div>
+        <div class="pmbar"><span><i class="sf" data-sf="plus"></i></span><span><i class="sf" data-sf="minus"></i></span><span style="flex:1;border:0;justify-content:flex-end;padding-right:10px;font-size:11px;width:auto">来源标签 · 更新后重启 · ›</span></div>
+      </div>
+    </div>
+    <div class="foot">Xup 会用 Homebrew、应用自带的 Sparkle appcast / electron-updater 清单、mas 或你手动配置的来源来更新这些应用。无法识别且未配置的应用标为"自更新"，Xup 只显示版本并提供"启动应用"。点击任一行可配置更新来源。</div>
+  </div>
+</div>
+
+<p class="note">自更新行（<code>.selfUpdating</code>）是一个独立的只读态，与 §14.2 "由 claude.ai 同步"同类：<code>canUpdate = false</code>、<code>isActionable = false</code>，不计入角标与"全部更新"，不是 <code>.unknown</code>。真正的"未知"只保留给读取失败（如 Sparkle appcast 请求失败、mas 未安装）。</p>
+
+<script src="sf.js"></script>
+</body></html>

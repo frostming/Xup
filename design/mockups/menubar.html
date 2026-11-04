@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Xup · 菜单栏面板</title><link rel="stylesheet" href="mac.css">
+<style>.scene{display:flex;flex-direction:column;align-items:flex-end;gap:10px;width:420px}.scene .menubar{width:100%}.row{display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start}.lbl{color:#fff;font-size:12px;font-weight:600;margin:0 0 8px;opacity:.9}.icons{display:flex;gap:28px;align-items:center;background:rgba(255,255,255,.55);backdrop-filter:blur(20px);border-radius:8px;padding:6px 18px;color:#1d1d1f}body.dark .icons{background:rgba(40,40,44,.75);color:#f2f2f2}.icons div{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:10px;color:var(--secondary)}</style></head>
+<body>
+<div class="nav"><b>Xup 原型</b><a href="main.html">主窗口</a><a class="on" href="menubar.html">菜单栏</a><a href="settings.html">设置</a><a href="states.html">状态</a><a href="picker.html">选择软件</a><a href="app-source.html">应用来源</a><span class="sp"></span><button id="theme">切换到深色</button></div>
+
+<h1 class="page">菜单栏 — MenuBarExtra(.window) 面板，宽 320</h1>
+<p class="lead">Xup 是纯菜单栏应用（LSUIElement，不占 Dock），此面板是主入口："打开 Xup"在所有状态下都是唯一的 prominent 按钮。四种面板状态：有可更新 / 全部最新 / 检查中 / 更新中。角标用 systemOrange 胶囊自绘。</p>
+
+<p class="lbl">状态栏图标四态</p>
+<div class="icons" style="display:inline-flex;margin-bottom:28px">
+  <div><span class="mbicon"><i class="sf" data-sf="arrow.up.circle"></i></span>空闲 · 无更新</div>
+  <div><span class="mbicon"><i class="sf" data-sf="arrow.up.circle.fill"></i><span class="ct">3</span></span>有 3 个更新</div>
+  <div><span class="mbicon" style="opacity:.6"><i class="sf" data-sf="arrow.triangle.2.circlepath"></i></span>检查/更新中（淡入淡出）</div>
+  <div><span class="mbicon"><i class="sf" data-sf="arrow.up.circle.fill"></i><span class="ct red">!</span></span>有失败</div>
+</div>
+
+<div class="row">
+<div class="scene">
+  <p class="lbl" style="align-self:flex-start">A · 有可更新项（默认）</p>
+  <div class="menubar"><span class="sec">Wi‑Fi</span><span class="mbicon active"><i class="sf" data-sf="arrow.up.circle.fill"></i><span class="ct">5</span></span><span>周二 09:14</span></div>
+  <div class="panel">
+    <div class="hd"><i class="sf orange" data-sf="arrow.up.circle.fill"></i><div class="tt"><b>5 个可更新</b><span>上次检查 今天 09:12</span></div><span class="tb icon" title="检查更新"><i class="sf" data-sf="arrow.clockwise"></i></span></div>
+    <hr>
+    <div class="prow"><i class="sf" data-sf="macwindow"></i><span class="n">IINA</span><span class="v">1.3.9 → <b>1.4.0</b></span></div>
+    <div class="prow"><i class="sf" data-sf="mug"></i><span class="n">node</span><span class="v">22.1.0 → <b>22.3.0</b></span></div>
+    <div class="prow"><i class="sf" data-sf="cpu"></i><span class="n">Claude Code</span><span class="v">1.0.3 → <b>1.0.5</b></span></div>
+    <div class="prow"><i class="sf" data-sf="shippingbox"></i><span class="n">typescript</span><span class="v">5.5.4 → <b>5.6.2</b></span></div>
+    <div class="prow"><i class="sf" data-sf="mug"></i><span class="n">google-chrome</span><span class="v">130.0.6723.59 → <b>130.0.6723.92</b></span></div>
+    <div class="more">还有 1 项… <span class="annot">仅 >5 项时显示，点击打开主窗口</span></div>
+    <hr>
+    <div style="display:flex;gap:8px"><div class="full"><i class="sf" data-sf="macwindow"></i>打开 Xup</div><div class="full bordered" style="color:var(--primary)"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</div></div>
+    <hr>
+    <div class="mitem">检查更新<span class="sp"></span><kbd>⌘R</kbd></div>
+    <div class="mitem">设置…<span class="sp"></span><kbd>⌘,</kbd></div>
+    <div class="mitem">退出 Xup<span class="sp"></span><kbd>⌘Q</kbd></div>
+  </div>
+</div>
+
+<div class="scene">
+  <p class="lbl" style="align-self:flex-start">B · 全部最新</p>
+  <div class="menubar"><span class="sec">Wi‑Fi</span><span class="mbicon active"><i class="sf" data-sf="arrow.up.circle"></i></span><span>周二 09:14</span></div>
+  <div class="panel">
+    <div class="hd"><i class="sf green" data-sf="checkmark.circle.fill"></i><div class="tt"><b>全部已是最新</b><span>24 个条目 · 上次检查 今天 09:12</span></div><span class="tb icon"><i class="sf" data-sf="arrow.clockwise"></i></span></div>
+    <hr>
+    <div class="full"><i class="sf" data-sf="macwindow"></i>打开 Xup</div>
+    <hr>
+    <div class="mitem">检查更新<span class="sp"></span><kbd>⌘R</kbd></div>
+    <div class="mitem">设置…<span class="sp"></span><kbd>⌘,</kbd></div>
+    <div class="mitem">退出 Xup<span class="sp"></span><kbd>⌘Q</kbd></div>
+  </div>
+</div>
+</div>
+
+<div class="row" style="margin-top:36px">
+<div class="scene">
+  <p class="lbl" style="align-self:flex-start">C · 检查中（显示上次结果，置灰）</p>
+  <div class="menubar"><span class="sec">Wi‑Fi</span><span class="mbicon active" style="opacity:.7"><i class="sf" data-sf="arrow.triangle.2.circlepath"></i></span><span>周二 09:14</span></div>
+  <div class="panel">
+    <div class="hd"><span class="spinner" style="margin:4px 5px 0 3px"></span><div class="tt"><b>正在检查更新…</b><span>Homebrew、npm、Agents、应用</span></div><span class="tb icon disabled"><i class="sf" data-sf="arrow.clockwise"></i></span></div>
+    <hr>
+    <div class="prow dim"><i class="sf" data-sf="macwindow"></i><span class="n">IINA</span><span class="v">1.3.9 → <b>1.4.0</b></span></div>
+    <div class="prow dim"><i class="sf" data-sf="mug"></i><span class="n">node</span><span class="v">22.1.0 → <b>22.3.0</b></span></div>
+    <div class="prow dim"><i class="sf" data-sf="cpu"></i><span class="n">Claude Code</span><span class="v">1.0.3 → <b>1.0.5</b></span></div>
+    <hr>
+    <div class="full"><i class="sf" data-sf="macwindow"></i>打开 Xup</div>
+    <hr>
+    <div class="mitem disabled" style="opacity:.5">检查更新<span class="sp"></span><kbd>⌘R</kbd></div>
+    <div class="mitem">设置…<span class="sp"></span><kbd>⌘,</kbd></div>
+    <div class="mitem">退出 Xup<span class="sp"></span><kbd>⌘Q</kbd></div>
+  </div>
+</div>
+
+<div class="scene">
+  <p class="lbl" style="align-self:flex-start">D · 更新中 + 有失败</p>
+  <div class="menubar"><span class="sec">Wi‑Fi</span><span class="mbicon active" style="opacity:.7"><i class="sf" data-sf="arrow.triangle.2.circlepath"></i><span class="ct red">!</span></span><span>周二 09:14</span></div>
+  <div class="panel">
+    <div class="hd"><span class="spinner accent" style="margin:4px 5px 0 3px"></span><div class="tt"><b>正在更新 IINA (2/3)</b><span>1 已完成 · <span class="red">1 个失败</span></span></div></div>
+    <div class="prog" style="width:100%;margin:8px 0 2px"><i style="width:60%"></i></div>
+    <hr>
+    <div class="prow"><i class="sf green" data-sf="checkmark.seal.fill"></i><span class="n">ripgrep</span><span class="v">已更新到 <b>14.1.1</b></span></div>
+    <div class="prow"><i class="sf red" data-sf="xmark.circle.fill"></i><span class="n">visual-studio-code</span><span class="v red">失败</span></div>
+    <div class="prow"><span class="spinner sm accent" style="margin:0 2px"></span><span class="n">IINA</span><span class="v">下载中 48%<span class="annot" style="margin-left:4px">Sparkle 阶段文案</span></span></div>
+    <div class="prow dim"><i class="sf" data-sf="mug"></i><span class="n">node</span><span class="v">等待中</span></div>
+    <hr>
+    <div style="display:flex;gap:8px"><div class="full"><i class="sf" data-sf="macwindow"></i>打开 Xup</div><div class="full bordered"><i class="sf" data-sf="stop.circle"></i>停止</div></div>
+    <hr>
+    <div class="mitem disabled" style="opacity:.5">检查更新<span class="sp"></span><kbd>⌘R</kbd></div>
+    <div class="mitem">设置…<span class="sp"></span><kbd>⌘,</kbd></div>
+    <div class="mitem">退出 Xup<span class="sp"></span><kbd>⌘Q</kbd></div>
+  </div>
+</div>
+</div>
+
+<p class="note" style="margin-top:36px">规格：外边距 12；行高 32；摘要 .headline + .caption .secondary；版本 .caption .secondary，新版本 .primary medium；"打开 Xup" = .borderedProminent .controlSize(.large)，是面板中唯一的 prominent 按钮（应用无 Dock 图标，这里是主入口）；有可更新项时"全部更新"(.bordered) 与之并排等宽，更新中换成"停止"；底部三项为 plain button，悬停高亮使用 accent 背景（与系统菜单一致）。点击任一条目 → 打开主窗口并选中该行。面板不显示日志。</p>
+
+<script src="sf.js"></script>
+</body></html>

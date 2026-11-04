@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Xup · 状态</title><link rel="stylesheet" href="mac.css">
+<style>.mini{width:440px;height:300px}.mini .split{height:100%}.mini .sidebar{width:150px;padding:8px 6px}.mini .srow{height:24px;font-size:12px}.lbl{color:#fff;font-size:12px;font-weight:600;margin:0 0 8px;opacity:.9}.sec-title{color:#fff;font-size:15px;font-weight:600;margin:40px 0 14px;text-shadow:0 1px 2px rgba(0,0,0,.3)}</style></head>
+<body>
+<div class="nav"><b>Xup 原型</b><a href="main.html">主窗口</a><a href="menubar.html">菜单栏</a><a href="settings.html">设置</a><a class="on" href="states.html">状态</a><a href="picker.html">选择软件</a><a href="app-source.html">应用来源</a><span class="sp"></span><button id="theme">切换到深色</button></div>
+
+<h1 class="page">状态 — ContentUnavailableView、徽标图例、确认框与通知</h1>
+<p class="lead">空状态居中：symbol 48pt .secondary，标题 .title3，描述 .body .secondary，一个 .bordered 按钮（首次启动为 .borderedProminent）。</p>
+
+<div class="sec-title">1 · 状态徽标图例（StatusBadge）</div>
+<div class="card" style="max-width:940px">
+  <div class="legend">
+    <div><div class="st sec"><span class="spinner sm"></span>检查中</div><code>.checking → ProgressView(.mini) · .secondary</code></div>
+    <div><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新</div><code>.outdated → arrow.up.circle.fill · Color.orange</code></div>
+    <div><div class="st sec"><i class="sf" data-sf="pin.fill"></i>可更新 <span class="msg">· 已 pin，跳过</span></div><code>.outdated && !canUpdate（pinned）→ pin.fill · .secondary</code></div>
+    <div><div class="st sec"><i class="sf" data-sf="arrow.up.circle"></i>可更新 <span class="msg">· 未知安装方式，无更新命令</span></div><code>.outdated && !canUpdate → arrow.up.circle · .secondary</code></div>
+    <div><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div><code>.upToDate → checkmark.circle.fill · Color.green</code></div>
+    <div><div class="st sec"><i class="sf" data-sf="questionmark.circle"></i>未知 <span class="msg">· PyPI 查询失败: timeout</span></div><code>.unknown(msg) → questionmark.circle · .secondary</code></div>
+    <div><div class="st accent"><span class="spinner sm accent"></span>更新中</div><code>.updating → ProgressView(.mini) · accent，行底 accent 6%</code></div>
+    <div><div class="st green"><i class="sf" data-sf="checkmark.seal.fill"></i>已更新</div><code>.updated → checkmark.seal.fill · Color.green</code></div>
+    <div><div class="st red"><i class="sf" data-sf="xmark.circle.fill"></i>失败 <span class="msg">· 退出码 1</span> <span class="btn" style="margin-left:4px"><i class="sf" data-sf="arrow.counterclockwise"></i>重试</span></div><code>.failed(msg) → xmark.circle.fill · Color.red + 重试</code></div>
+  </div>
+</div>
+
+<div class="sec-title">2 · 空状态 / 覆盖视图</div>
+<div class="grid">
+  <div>
+    <p class="lbl">2.1 首次启动（从未检查）</p>
+    <div class="window mini"><div class="split">
+      <div class="sidebar"><div class="srow sel"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span></div><div class="sect">来源</div><div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span></div><div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span></div><div class="srow dim"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div><div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span></div><div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span></div></div>
+      <div class="content"><div class="empty"><i class="sf xl" data-sf="arrow.up.circle"></i><h3>欢迎使用 Xup</h3><p>Xup 会在一处为你检查 Homebrew、npm、uv、CLI agent 与应用的更新。</p><div class="acts"><span class="btn lg prominent"><i class="sf" data-sf="arrow.clockwise"></i>检查更新</span><span class="link">添加应用…</span></div></div></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="lbl">2.2 检查中（无缓存结果）</p>
+    <div class="window mini"><div class="split">
+      <div class="sidebar"><div class="srow sel"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span></div><div class="sect">来源</div><div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="spinner sm"></span></div><div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="spinner sm"></span></div><div class="srow dim"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div><div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="spinner sm"></span></div><div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span><span class="spinner sm"></span></div></div>
+      <div class="content"><div class="empty"><span class="spinner lg" style="margin-bottom:10px"></span><h3>正在检查更新…</h3><p>正在查询 Homebrew、npm、Agents、应用</p></div>
+        <div class="statusbar"><span>正在检查…</span><span class="sp"></span><span class="prog indet"><i></i></span></div></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="lbl">2.3 来源不可用（选中 uv tool）</p>
+    <div class="window mini"><div class="split">
+      <div class="sidebar"><div class="srow"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span><span class="badge orange">5</span></div><div class="sect">来源</div><div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="badge orange">2</span></div><div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="badge orange">1</span></div><div class="srow sel dim"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div><div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="badge orange">1</span></div><div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span><span class="badge orange">1</span></div></div>
+      <div class="content"><div class="empty"><i class="sf xl" data-sf="exclamationmark.triangle"></i><h3>未检测到 uv</h3><p>Xup 在 PATH 中找不到 <span class="mono">uv</span>。安装后重新检测即可。</p><div class="acts"><span class="btn lg">重新检测</span><span class="link">安装说明</span></div></div></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="lbl">2.4 全部最新（"显示已是最新"关闭时）</p>
+    <div class="window mini"><div class="split">
+      <div class="sidebar"><div class="srow sel"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span></div><div class="sect">来源</div><div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span></div><div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span></div><div class="srow"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div><div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span></div><div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span></div></div>
+      <div class="content"><div class="empty"><i class="sf xl green" data-sf="checkmark.circle" style="color:var(--green)"></i><h3>全部已是最新</h3><p>24 个条目均为最新版本。上次检查 今天 09:12</p><div class="acts"><span class="btn lg"><i class="sf" data-sf="arrow.clockwise"></i>再次检查</span></div></div>
+        <div class="statusbar"><span>共 24 项 · 0 个可更新</span><span class="sp"></span><span>上次检查 今天 09:12</span></div></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="lbl">2.5 应用分区为空</p>
+    <div class="window mini"><div class="split">
+      <div class="sidebar"><div class="srow"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span><span class="badge orange">4</span></div><div class="sect">来源</div><div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="badge orange">2</span></div><div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="badge orange">1</span></div><div class="srow dim"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div><div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="badge orange">1</span></div><div class="srow sel"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span></div></div>
+      <div class="content"><div class="empty"><i class="sf xl" data-sf="macwindow.badge.plus"></i><h3>还没有跟踪的应用</h3><p>添加 /Applications 中的应用，Xup 会自动识别它来自 Homebrew、Sparkle 还是 App Store。</p><div class="acts"><span class="btn lg prominent"><i class="sf" data-sf="plus"></i>添加应用…</span></div></div></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="lbl">2.6 搜索无结果 / 2.7 无任何可用来源</p>
+    <div class="window mini" style="height:140px;margin-bottom:20px"><div class="split"><div class="content"><div class="empty" style="padding:16px"><i class="sf" data-sf="magnifyingglass" style="width:28px;height:28px;color:var(--tertiary)"></i><h3 style="font-size:15px">没有匹配"ffmpg"的条目</h3><div class="acts"><span class="link">清除搜索</span></div></div></div></div></div>
+    <div class="window mini" style="height:140px"><div class="split"><div class="content"><div class="empty" style="padding:16px"><i class="sf" data-sf="questionmark.folder" style="width:28px;height:28px;color:var(--tertiary)"></i><h3 style="font-size:15px">没有可用的更新来源</h3><p style="font-size:11px;margin-bottom:6px">未检测到 Homebrew、npm、uv 或已知的 CLI agent。你仍可以在"应用"中添加 App。</p><div class="acts"><span class="btn">添加应用…</span></div></div></div></div></div>
+  </div>
+</div>
+
+<div class="sec-title">3 · 更新失败（行级）+ 完成态状态栏</div>
+<div class="window" style="width:720px">
+  <div class="split" style="height:auto;display:block">
+    <div class="content">
+      <div class="table"><table>
+        <colgroup><col style="width:30px"><col><col style="width:100px"><col style="width:100px"><col style="width:220px"><col style="width:120px"></colgroup>
+        <thead><tr><th></th><th>名称</th><th>已安装</th><th>最新</th><th>状态</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><span class="cb"></span></td><td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><b>visual-studio-code</b><small>cask</small></div></div></td><td class="ver">1.93.1</td><td class="ver new">1.94.0</td><td><div class="st red" title="Permission denied @ rb_sysopen"><i class="sf" data-sf="xmark.circle.fill"></i>失败<span class="msg">· Permission denied @ rb_sysopen…</span></div></td><td><div class="row-actions"><span class="btn hover show"><i class="sf" data-sf="arrow.counterclockwise"></i>重试</span><span class="btn hover show plain" title="在日志中查看"><i class="sf" data-sf="terminal"></i></span></div></td></tr>
+          <tr><td></td><td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><b>ripgrep</b><small>formula</small></div></div></td><td class="ver">14.1.1</td><td class="ver">14.1.1</td><td><div class="st green"><i class="sf" data-sf="checkmark.seal.fill"></i>已更新</div></td><td></td></tr>
+          <tr><td></td><td><div class="nm"><i class="sf" data-sf="macwindow"></i><div class="t"><b>IINA</b><small>Sparkle · iina.io</small></div></div></td><td class="ver">1.4.0</td><td class="ver">1.4.0</td><td><div class="st green"><i class="sf" data-sf="checkmark.seal.fill"></i>已更新<span class="msg">· 已重启</span></div></td><td><div class="row-actions"><span class="sw on"></span></div></td></tr>
+        </tbody></table></div>
+      <div class="statusbar"><span class="red">完成：2 成功，1 失败</span><span class="sp"></span><span>上次检查 今天 09:12</span></div>
+      <div class="log" style="height:84px"><div class="loghead"><i class="sf" data-sf="terminal"></i>日志<span class="sp"></span><span class="ib on"><i class="sf" data-sf="exclamationmark.triangle"></i>仅错误</span></div>
+        <div class="logbody"><div class="ll err"><span class="tm">09:14:14</span><span class="src">[brew]</span><span class="tx">Error: Permission denied @ rb_sysopen - /Applications/Visual Studio Code.app/Contents/Info.plist</span></div><div class="ll err"><span class="tm">09:14:14</span><span class="src">[xup]</span><span class="tx">visual-studio-code 更新失败（退出码 1）</span></div></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="sec-title">4 · 确认框（Alert）与通知</div>
+<div class="grid">
+  <div><p class="lbl">全部更新 &gt; 5 项</p>
+    <div class="alert"><i class="sf xl" data-sf="arrow.up.circle.fill"></i><b>将更新 12 个条目</b><p>可能需要几分钟。包含自动更新的 cask（--greedy 已开启）。</p><span class="btn prominent">全部更新</span><span class="btn">取消</span></div></div>
+  <div><p class="lbl">更新正在运行的应用</p>
+    <div class="alert"><i class="sf xl" data-sf="exclamationmark.triangle.fill" style="color:var(--orange)"></i><b>以下应用正在运行，更新时将被退出</b><p>IINA、Raycast<br>更新完成后会自动重新打开。</p><span class="btn prominent">更新并重启</span><span class="btn">取消</span></div></div>
+  <div><p class="lbl">恢复默认 agents.json</p>
+    <div class="alert"><i class="sf xl" data-sf="cpu"></i><b>恢复默认的 agents.json？</b><p>你的修改会被覆盖，当前文件会备份为 agents.json.bak。</p><span class="btn red" style="border-color:var(--red)">恢复默认</span><span class="btn">取消</span></div></div>
+  <div style="display:flex;flex-direction:column;gap:12px"><p class="lbl" style="margin:0">通知（UNNotification）</p>
+    <div class="notif"><div class="ic"><i class="sf" data-sf="arrow.up.circle.fill"></i></div><div><b>Xup · 发现 3 个更新</b><span>iina、node、Claude Code</span></div><small>现在</small></div>
+    <div class="notif"><div class="ic"><i class="sf" data-sf="checkmark.seal.fill"></i></div><div><b>Xup · 更新完成</b><span>2 成功，<span class="red">1 失败</span> · 点击查看日志</span></div><small>1 分钟前</small></div>
+  </div>
+</div>
+
+<script src="sf.js"></script>
+</body></html>
