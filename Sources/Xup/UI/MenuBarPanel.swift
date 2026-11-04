@@ -235,13 +235,6 @@ struct MenuBarPanel: View {
             PanelMenuItem(title: "检查更新", shortcut: "⌘R") { ui.check(center: center) }
                 .disabled(center.isChecking || isUpdating || nothingTracked)
                 .keyboardShortcut("r", modifiers: .command)
-            PanelMenuItem(title: "设置…", shortcut: "⌘,") {
-                // MenuBarExtra 面板是独立窗口，sendAction(showSettingsWindow:) 在这里没有响应链目标；
-                // 用 SwiftUI 的 openSettings 环境动作，并先激活应用让设置窗口到前台。
-                XupActions.activate()
-                openSettings()
-            }
-                .keyboardShortcut(",", modifiers: .command)
             PanelMenuItem(title: "退出 Xup", shortcut: "⌘Q") { NSApp.terminate(nil) }
                 .keyboardShortcut("q", modifiers: .command)
         }

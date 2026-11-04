@@ -54,6 +54,7 @@ struct MainWindow: View {
 // MARK: - 侧栏
 
 struct SidebarView: View {
+    @Environment(\.openSettings) private var openSettings
     @EnvironmentObject private var center: UpdateCenter
     @EnvironmentObject private var history: UpdateHistory
     @EnvironmentObject private var ui: UIState
@@ -81,6 +82,25 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // 设置入口放在侧栏左下角（菜单栏面板不再提供"设置…"）。
+            HStack {
+                Button {
+                    XupActions.activate()
+                    openSettings()
+                } label: {
+                    Label("设置", systemImage: "gearshape")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .keyboardShortcut(",", modifiers: .command)
+                .help("打开设置（⌘,）")
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
         .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
     }
 
