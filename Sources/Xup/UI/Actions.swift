@@ -59,7 +59,7 @@ enum XupActions {
     }
 }
 
-/// 来源 tag（设置 › 应用 使用）。
+/// 来源 tag（应用配置 Sheet 使用）。
 func appSourceTag(detail: String?) -> String {
     guard let d = detail else { return "未知" }
     if d.hasPrefix("Homebrew cask") { return "Homebrew cask" }
@@ -126,7 +126,7 @@ enum AppRunningPolicy: Hashable, CaseIterable {
         }
     }
 
-    /// 设置 › 应用 列表下方的说明。
+    /// 两种运行时处理方式的说明。
     static let explanation = "每个应用可在“配置应用…”里选择正在运行时的处理：“自动退出并重新打开”（运行中自动重开）会在替换前退出、替换后重开；“等我关闭后再更新”（运行中跳过）则在应用运行时跳过本次更新，等你关闭后再更新。"
 
     /// 策略为"等我关闭后再更新"且应用正在运行、又有新版本时，状态列的提示。

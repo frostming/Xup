@@ -333,15 +333,21 @@ final class UpdateCenter: ObservableObject {
         items.filter { $0.kind == kind && $0.isActionable }.count
     }
 
-    /// nil 表示全部；根据 showUpToDate 过滤；待安装 → 可更新 在前，其次按名称排序。
+    /// nil 表示全部；根据 showUpToDate 过滤；排序：待安装 → 可更新 → 其他状态（失败 / 未知 / 更新中…）→ 最新，同组按名称。
     func items(for kind: ProviderKind?) -> [UpdateItem] {
         var list = items
         if let kind { list = list.filter { $0.kind == kind } }
         if !settings.showUpToDate { list = list.filter { $0.status != .upToDate } }
+        func tier(_ i: UpdateItem) -> Int {
+            if i.status.isStaged { return 0 }
+            if i.isActionable { return 1 }
+            if i.status.isOutdated { return 2 }
+            if i.status == .upToDate { return 4 }
+            return 3
+        }
         return list.sorted { a, b in
-            if a.status.isStaged != b.status.isStaged { return a.status.isStaged }
-            if a.isActionable != b.isActionable { return a.isActionable }
-            if a.status.isOutdated != b.status.isOutdated { return a.status.isOutdated }
+            let ta = tier(a), tb = tier(b)
+            if ta != tb { return ta < tb }
             let c = a.name.localizedCaseInsensitiveCompare(b.name)
             if c != .orderedSame { return c == .orderedAscending }
             return a.id < b.id

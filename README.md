@@ -14,9 +14,11 @@ macOS 菜单栏常驻的统一更新器。只检查、只更新你**关注**（�
 
 手动来源支持：GitHub Releases（owner/repo，可选资源名通配）、Tauri 更新 JSON、electron-updater `latest-mac.yml`、Sparkle appcast。
 
+主窗口默认列出**所有已关注的条目及当前版本**（工具栏 `全部 | 仅可更新` 可切换，对应 `ui.showUpToDate`）；每个来源分区有 `已关注 | 已安装` 两种模式——"已安装"列出本机该来源全部已安装软件，勾选即关注、切回"已关注"自动检查一次；应用在"应用"分区用 `+`/`−` 添加、移除。设置窗口只剩 通用 / Agents。
+
 其它：定时检查（间隔可配，默认 6 小时）、发现更新发系统通知、开机启动、纯菜单栏应用（不占 Dock）、**更新历史**（每次更新的成功/失败、版本、耗时、触发方式，侧栏"记录 › 更新历史"，`xup history`）。
 
-**更新方式（每条目）**：每个被关注的条目单独选 `手动更新`（默认）/ `空闲时自动更新`（定时检查发现新版本后等无键鼠输入 N 分钟或锁屏再自动执行）/ 仅应用的 `自动下载，手动重启`（立即后台下载校验并暂存到 `~/Library/Caches/dev.fming.xup/staged/`，列表显示蓝色"已下载 1.5.0 · 待安装"，点"安装并重启"才替换；可选子开关"空闲且应用未运行时自动安装"）。全局只保留"新关注条目的默认更新方式"与"空闲判定"阈值；表格右键"更新方式"、应用配置 Sheet、设置 › 软件 行尾标签、`xup policy` 都可改。
+**更新方式（每条目）**：每个被关注的条目单独选 `手动更新`（默认）/ `空闲时自动更新`（定时检查发现新版本后等无键鼠输入 N 分钟或锁屏再自动执行）/ 仅应用的 `自动下载，手动重启`（立即后台下载校验并暂存到 `~/Library/Caches/dev.fming.xup/staged/`，列表显示蓝色"已下载 1.5.0 · 待安装"，点"安装并重启"才替换；可选子开关"空闲且应用未运行时自动安装"）。全局只保留"新关注条目的默认更新方式"与"空闲判定"阈值；表格右键"更新方式"、应用配置 Sheet、各来源分区"已安装"清单的行尾标签、`xup policy` 都可改。
 
 ## 构建与安装
 
@@ -36,7 +38,7 @@ make install    # 拷贝到 /Applications
 - `Sources/xup-cli/` — 独立的 `xup` 命令行（不链接 App 代码）
 - `Support/` — Info.plist、`config.schema.json`、面向 agent 的 `SKILL.md`
 - `Sources/Xup/Providers/` — 各来源实现；`Sparkle.swift` 含 appcast 解析与 AppInstaller（`prepare` 暂存 / `apply` 替换）；`Staging.swift` 为持久暂存目录与元数据校验；`AppSources.swift` 含 electron / GitHub / Tauri / appcast 的版本与下载地址解析
-- `Sources/Xup/UI/` — 主窗口、菜单栏面板、设置、选择软件 Sheet、应用来源配置 Sheet
+- `Sources/Xup/UI/` — 主窗口（每个来源分区有"已关注 | 已安装"两种模式，"已安装"即勾选关注的清单 `InstalledListView`）、菜单栏面板、设置（通用 / Agents）、应用来源配置 Sheet
 - `design/` — 设计规范 `DESIGN.md` 与 HTML 原型；`ACCEPTANCE.md`、`DECISIONS.md` 为验收与决策记录
 
 ## Agent 接口（v1.1）

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// §19.3 "更新方式"菜单的目标：来自列表条目或 设置 › 软件 的关注行。
+/// §19.3 "更新方式"菜单的目标：来自列表条目或"已安装"清单的关注行。
 struct PolicyTarget: Hashable {
     let id: String
     let isApp: Bool
@@ -16,7 +16,7 @@ struct PolicyTarget: Hashable {
         self.item = item
     }
 
-    /// 设置 › 软件 的行：只知道来源与关注名（homebrew 可带 detail = formula/cask）。
+    /// "已安装"清单的行：只知道来源与关注名（homebrew 可带 detail = formula/cask）。
     init(kind: ProviderKind, name: String, detail: String?) {
         if kind == .homebrew {
             let sub = (detail == "cask" || detail == "formula") ? detail! : "formula"

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// §7 设置窗口：四 Tab 统一 620×520（§13.7 "软件"Tab 为原"选择软件…"Sheet，需要这个尺寸；其余 Tab 为可滚动 Form）。
+/// §7 / §21 设置窗口：只剩 通用 / Agents 两个 Tab，统一 620×520；"软件"与"应用"的管理在主窗口里（各来源分区的"已安装"模式、应用分区）。
 /// Tab 选择由 `UIState.settingsTab` 驱动，便于主窗口 / 菜单栏入口直接定位到某个 Tab。
 struct SettingsView: View {
     @EnvironmentObject private var ui: UIState
@@ -14,18 +14,10 @@ struct SettingsView: View {
                 .frame(width: Self.tabSize.width, height: Self.tabSize.height)
                 .tabItem { Label("通用", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
-            WatchListPane()
-                .frame(width: Self.tabSize.width, height: Self.tabSize.height)
-                .tabItem { Label("软件", systemImage: "checklist") }
-                .tag(SettingsTab.watch)
             AgentsSettings()
                 .frame(width: Self.tabSize.width, height: Self.tabSize.height)
                 .tabItem { Label("Agents", systemImage: "cpu") }
                 .tag(SettingsTab.agents)
-            AppsSettings()
-                .frame(width: Self.tabSize.width, height: Self.tabSize.height)
-                .tabItem { Label("应用", systemImage: "macwindow") }
-                .tag(SettingsTab.apps)
         }
         .background(WindowSnapshotHook("settings", delay: 1.5))
     }
@@ -187,13 +179,20 @@ struct GeneralSettings: View {
             }
 
             Section {
-                LabeledContent("跟踪的软件", value: "\(trackedCount) 项")
-                Button {
-                    ui.selectWatchTab(kind: ui.sidebar?.kind)
-                } label: {
-                    Label("选择软件…", systemImage: "checklist")
+                LabeledContent("跟踪的软件") {
+                    HStack(spacing: 8) {
+                        Text("\(trackedCount) 项").foregroundStyle(.secondary)
+                        Button("管理…") {
+                            // §21：打开主窗口并切到 Homebrew 分区的"已安装"模式。
+                            ui.showInstalled(kind: .homebrew)
+                            ui.mainWindowRequested = true
+                            openWindow(id: XupActions.mainWindowID)
+                            XupActions.activate()
+                        }
+                        .controlSize(.small)
+                        .help("在主窗口各来源分区的“已安装”中勾选要跟踪的软件；应用在“应用”分区添加")
+                    }
                 }
-                .help("切换到“软件”Tab，勾选要跟踪的条目")
                 LabeledContent("版本", value: XupFormat.appVersion)
             }
         }
@@ -279,129 +278,5 @@ struct AgentsSettings: View {
     private func resetToDefault() {
         try? FileManager.default.removeItem(at: AppSettings.agentSpecsURL)
         reload()
-    }
-}
-
-// MARK: - 应用
-
-struct AppsSettings: View {
-    @EnvironmentObject private var settings: AppSettings
-    @EnvironmentObject private var center: UpdateCenter
-    @EnvironmentObject private var ui: UIState
-    @State private var selected: Set<String> = []
-    /// 设置窗口自己的 Sheet 状态（与主窗口的 ui.sourceSheetApp 分开，避免两处同时弹出）。
-    @State private var sourceSheetApp: ManagedApp?
-
-    var body: some View {
-        // 不放在 Form(.grouped) 里：Form 本身是滚动视图，内嵌固定高度的 List 会出现"滚不动、没有滚动条、末行被裁"的问题。
-        // 这里让 List 占满剩余高度并原生滚动，脚注固定在下方。
-        VStack(alignment: .leading, spacing: 0) {
-            Group {
-                if settings.managedApps.isEmpty {
-                    ContentUnavailableView("还没有跟踪的应用", systemImage: "macwindow.badge.plus")
-                } else {
-                    List(settings.managedApps, selection: $selected) { app in
-                        appRow(app)
-                    }
-                    .listStyle(.inset(alternatesRowBackgrounds: true))
-                    .onDeleteCommand { removeSelected() }
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
-
-            HStack(spacing: 0) {
-                Button { add() } label: { Image(systemName: "plus").frame(width: 20, height: 20) }
-                    .help("添加应用…")
-                Divider().frame(height: 14)
-                Button { removeSelected() } label: { Image(systemName: "minus").frame(width: 20, height: 20) }
-                    .disabled(selected.isEmpty)
-                    .help("移除选中的应用")
-                Spacer()
-            }
-            .buttonStyle(.borderless)
-            .padding(.vertical, 6)
-
-        }
-        .padding(20)
-        .sheet(item: $sourceSheetApp) { app in
-            AppSourceSheet(app: app)
-        }
-    }
-
-    private func appRow(_ app: ManagedApp) -> some View {
-        let item = center.items.first { $0.id == "app:\(app.path)" }
-        let selfUpdating = item?.isSelfUpdating ?? false
-        return HStack(spacing: 10) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
-                .resizable().frame(width: 20, height: 20)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(app.name).lineLimit(1)
-                Text(app.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                    .font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.middle)
-            }
-            Spacer()
-            sourceTag(app: app, item: item)
-                .lineLimit(1)
-                .fixedSize()
-            // §17 / §19.3：更新方式 + 运行时策略 只读简述，如"空闲自动 · 运行中自动重开"；修改在"配置应用…"Sheet 里。
-            if !selfUpdating {
-                let running = AppRunningPolicy(restartAfterUpdate: app.restartAfterUpdate)
-                let update = item.map { settings.policy(for: $0) } ?? settings.policy(for: app.itemID)
-                Text("\(update.shortTag) · \(running.shortTag)")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(1).fixedSize()
-                    .help("更新方式：\(update.title)" + (update == .autoDownload && app.installWhenIdle ? "（空闲且未运行时自动安装）" : "") + "；应用正在运行时：" + running.tooltip)
-            }
-            Button { sourceSheetApp = app } label: {
-                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
-                    .frame(width: 20, height: 20).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("配置应用…")
-        }
-        .tag(app.path)
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        .onTapGesture { sourceSheetApp = app }
-    }
-
-    /// §16.5 来源标签三种样式：普通灰胶囊 / 自定义 accent / 自更新虚线。
-    @ViewBuilder private func sourceTag(app: ManagedApp, item: UpdateItem?) -> some View {
-        if let source = app.source {
-            Label(source.tagText, systemImage: "slider.horizontal.3")
-                .font(.caption)
-                .foregroundStyle(Color.accentColor)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Color.accentColor.opacity(0.10), in: Capsule())
-                .help(source.tooltip)
-        } else if item?.isSelfUpdating ?? false {
-            Label("自更新", systemImage: "arrow.triangle.2.circlepath")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .overlay(Capsule().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [3, 2])).foregroundStyle(.tertiary))
-                .help("无法识别且未配置：点击配置更新来源")
-        } else {
-            Text(appSourceTag(detail: item?.detail))
-                .font(.caption)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Color.secondary.opacity(0.15), in: Capsule())
-        }
-    }
-
-    private func add() {
-        XupActions.chooseApps { paths in
-            settings.addApps(paths: paths)
-            ui.check(center: center)
-        }
-    }
-
-    private func removeSelected() {
-        for p in selected { settings.removeApp(path: p) }
-        selected = []
-        ui.check(center: center)
     }
 }

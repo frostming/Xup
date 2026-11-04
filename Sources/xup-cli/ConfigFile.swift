@@ -58,7 +58,7 @@ enum ConfigFile {
             "version": 1,
             "check": ["intervalMinutes": 360, "notify": true, "defaultPolicy": "manual", "idleMinutes": 5],
             "homebrew": ["greedy": false],
-            "ui": ["showUpToDate": false, "launchAtLogin": false],
+            "ui": ["showUpToDate": true, "launchAtLogin": false],
             "electron": ["deltaDownload": true, "keepVersionsPerApp": 1],
             "agent": ["allowUpdates": false],
             "tracked": Dictionary(uniqueKeysWithValues: kinds.map { ($0, [String]()) }),

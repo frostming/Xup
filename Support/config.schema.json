@@ -66,8 +66,8 @@
       "properties": {
         "showUpToDate": {
           "type": "boolean",
-          "default": false,
-          "description": "列表中显示已是最新的条目。Show up-to-date items in lists."
+          "default": true,
+          "description": "主页面显示全部已关注的条目（含已是最新的）；false 为只显示可更新项。Show all watched items (including up-to-date ones); false shows only outdated items."
         },
         "launchAtLogin": {
           "type": "boolean",

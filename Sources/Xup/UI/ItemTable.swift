@@ -41,7 +41,8 @@ struct ItemTable: View {
             .width(96)
 
             TableColumn(kind == .skill ? "远端提交" : "最新", value: \.latestText) { item in
-                Text(item.latestText)
+                // §21 "最新"行：没有单独的 latest 时显示当前版本（与"已安装"同值，.secondary）。
+                Text(item.status == .upToDate ? (item.latest ?? item.installed) : item.latestText)
                     .monospacedDigit()
                     .fontWeight(item.status.isOutdated ? .medium : .regular)
                     .foregroundStyle(item.status.isOutdated ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))

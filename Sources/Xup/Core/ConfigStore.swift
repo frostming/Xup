@@ -45,7 +45,7 @@ struct XupConfig: Codable, Equatable {
     }
 
     struct UI: Codable, Equatable {
-        var showUpToDate: Bool = false
+        var showUpToDate: Bool = true
         var launchAtLogin: Bool = false
     }
 
@@ -186,7 +186,7 @@ extension XupConfig.Homebrew {
 extension XupConfig.UI {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        showUpToDate = try c.decodeIfPresent(Bool.self, forKey: .showUpToDate) ?? false
+        showUpToDate = try c.decodeIfPresent(Bool.self, forKey: .showUpToDate) ?? true
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
     }
 }
@@ -742,8 +742,8 @@ enum ConfigSchema {
       "properties": {
         "showUpToDate": {
           "type": "boolean",
-          "default": false,
-          "description": "列表中显示已是最新的条目。Show up-to-date items in lists."
+          "default": true,
+          "description": "主页面显示全部已关注的条目（含已是最新的）；false 为只显示可更新项。Show all watched items (including up-to-date ones); false shows only outdated items."
         },
         "launchAtLogin": {
           "type": "boolean",
