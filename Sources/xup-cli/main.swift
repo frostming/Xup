@@ -5,7 +5,7 @@ import Foundation
 // 其余命令通过 Unix socket 调用运行中的 Xup（未运行时自动 `open -gj` 拉起）。
 // 退出码：0 成功 / 1 失败 / 2 参数错误。
 
-let cliVersion = "1.2.0"
+let cliVersion = "0.0.1"
 
 let usage = """
 用法：xup [--json] <命令> [参数]
