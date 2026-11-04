@@ -121,13 +121,13 @@ enum AppRunningPolicy: Hashable, CaseIterable {
 
     var tooltip: String {
         switch self {
-        case .relaunch: return "更新时若应用正在运行，Xup 会先下载校验，替换前自动退出它，替换后自动重新打开。"
-        case .waitForQuit: return "更新时若应用正在运行，这次更新会跳过；等你关闭应用后再更新。应用未运行时照常更新。"
+        case .relaunch: return "替换前退出应用，完成后重新打开。"
+        case .waitForQuit: return "应用运行时跳过本次更新。"
         }
     }
 
     /// 两种运行时处理方式的说明。
-    static let explanation = "每个应用可在“配置应用…”里选择正在运行时的处理：“自动退出并重新打开”（运行中自动重开）会在替换前退出、替换后重开；“等我关闭后再更新”（运行中跳过）则在应用运行时跳过本次更新，等你关闭后再更新。"
+    static let explanation = "应用运行时：自动退出并重新打开，或等你关闭后再更新。"
 
     /// 策略为"等我关闭后再更新"且应用正在运行、又有新版本时，状态列的提示。
     static let skippedWhileRunningHint = "应用运行中，按设置暂不更新；关闭后点“更新”，或在“配置应用…”里改为自动退出并重新打开"

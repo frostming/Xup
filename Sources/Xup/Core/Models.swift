@@ -108,9 +108,9 @@ enum UpdatePolicy: String, Codable, CaseIterable, Hashable, Identifiable {
     /// Sheet 选项下的一句说明。
     var explanation: String {
         switch self {
-        case .manual: return "定时检查只把条目标为可更新并通知，你点“更新”才执行。"
-        case .auto: return "发现新版本后等系统空闲（一段时间没有键鼠输入或已锁屏）再自动执行；应用遵循下方“正在运行时”的处理方式。"
-        case .autoDownload: return "发现新版本立即在后台下载、校验并暂存，不替换、不退出应用；你点“安装并重启”时才完成更新。"
+        case .manual: return "只提示，不自动更新。"
+        case .auto: return "系统空闲时自动更新。"
+        case .autoDownload: return "后台先下载好，点“安装并重启”时再替换。"
         }
     }
 

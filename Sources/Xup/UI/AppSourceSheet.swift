@@ -24,10 +24,10 @@ struct AppSourceSheet: View {
 
         var explanation: String {
             switch self {
-            case .github: return "从仓库的最新 Release 中读取版本（tag）并下载资源文件。"
-            case .tauri: return "读取更新 JSON 的 version 与 platforms[\"darwin-<arch>\"].url。"
-            case .electron: return "读取 latest-mac.yml 的 version 与 files，按本机架构选择文件并校验 sha512。"
-            case .appcast: return "读取 appcast 中最新一项的版本与 enclosure，按 Xup 既有 Sparkle 流程处理。"
+            case .github: return "读取最新 Release 的 tag 与资源文件"
+            case .tauri: return "Tauri 更新 JSON"
+            case .electron: return "electron-updater 的 latest-mac.yml"
+            case .appcast: return "Sparkle appcast"
             }
         }
 
@@ -169,11 +169,11 @@ struct AppSourceSheet: View {
                         .onChange(of: updatePolicy) { _, p in
                             if p == .autoDownload, !supportsStaging { updatePolicy = storedUpdatePolicy == .autoDownload ? .auto : storedUpdatePolicy }
                         }
-                        Text(selfUpdating ? "由应用自更新，Xup 不替它更新，此项无效。" : updatePolicy.explanation)
+                        Text(selfUpdating ? "该应用自行更新，此项无效。" : updatePolicy.explanation)
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         if !supportsStaging, !selfUpdating {
-                            Text("该应用由 \(stagingBlockedBy) 执行安装，不支持预下载。")
+                            Text("由 \(stagingBlockedBy) 安装，无法预下载")
                                 .font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -195,7 +195,7 @@ struct AppSourceSheet: View {
                     .labelsHidden()
                     .disabled(selfUpdating)
                 }
-                Text(selfUpdating ? "由应用自更新，Xup 不替它更新，此项无效。" : policy.tooltip)
+                Text(selfUpdating ? "该应用自行更新，此项无效。" : policy.tooltip)
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -287,7 +287,7 @@ struct AppSourceSheet: View {
                             if n != v { repo = n }
                             test = .idle
                         }
-                    Text(!repo.isEmpty && !repoValid ? "格式应为 owner/repo" : "格式 owner/repo，也可直接粘贴仓库 URL。")
+                    Text(!repo.isEmpty && !repoValid ? "格式应为 owner/repo" : "可直接粘贴仓库 URL")
                         .font(.caption).foregroundStyle(!repo.isEmpty && !repoValid ? .red : .secondary)
                 }
             }
@@ -297,7 +297,7 @@ struct AppSourceSheet: View {
                         .labelsHidden()
                         .textFieldStyle(.roundedBorder).monospaced()
                         .onChange(of: assetPattern) { _, _ in test = .idle }
-                    Text("通配符匹配 Release 资源文件名。留空时自动选择与本机架构匹配的 .dmg / .zip。")
+                    Text("留空则自动选择本机架构的 .dmg / .zip")
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -319,11 +319,11 @@ struct AppSourceSheet: View {
                         Label("未加密的 \(type == .appcast ? "appcast" : "URL")", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(.yellow)
                     } else if type == .electron {
-                        Text("填目录 URL 时自动补 latest-mac.yml。").font(.caption).foregroundStyle(.secondary)
+                        Text("目录 URL 会自动补 latest-mac.yml").font(.caption).foregroundStyle(.secondary)
                     } else if type == .tauri {
-                        Text("必须是完整的 JSON 地址。").font(.caption).foregroundStyle(.secondary)
+                        Text("更新 JSON 的完整地址").font(.caption).foregroundStyle(.secondary)
                     } else {
-                        Text("建议使用 https://。").font(.caption).foregroundStyle(.secondary)
+                        Text("建议使用 https").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -350,7 +350,7 @@ struct AppSourceSheet: View {
             case .idle:
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "info.circle")
-                    Text("尚未测试。保存前建议测试一次，确认 Xup 能读到版本与资源文件。")
+                    Text("尚未测试")
                 }
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -392,7 +392,7 @@ struct AppSourceSheet: View {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(msg).fontWeight(.semibold).foregroundStyle(.red).lineLimit(3)
-                        Text("检查字段是否正确，或稍后重试。仍可保存，但 Xup 可能无法读取版本。")
+                        Text("仍可保存，但可能读不到版本")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
