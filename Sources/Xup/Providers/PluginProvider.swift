@@ -150,15 +150,34 @@ struct PluginProvider: UpdateProvider {
         return versions.max { VersionCompare.compare($0, $1) == .orderedAscending }
     }
 
-    private func codexInstalledRows(log: @escaping Logger) async throws -> [(selector: String, status: String, version: String)] {
-        // `codex plugin list` 会联网刷新远程 marketplace，网络慢时很久不返回；这里限 25 秒，超时按失败处理（界面仍能显示 Claude 插件）。
-        log("读取 Codex 插件列表（codex plugin list，需联网，可能要十几秒）…", false)
-        let r = try await Shell.runChecked(["codex", "plugin", "list"], timeout: 25)
+    /// `codex plugin list --json [-m mkt]` 的已安装条目。不传 marketplace 时查全部（含远程目录，可能慢）。
+    /// 远程目录（openai-curated-remote）需要联网，网络慢时可达一分钟；按 marketplace 过滤能避开不相关的远程请求。
+    private func codexInstalledRows(marketplace: String? = nil, log: @escaping Logger) async throws -> [(selector: String, status: String, version: String)] {
+        var cmd = ["codex", "plugin", "list", "--json"]
+        if let marketplace { cmd += ["-m", marketplace] }
+        log("$ " + cmd.joined(separator: " "), false)
+        let r = try await Shell.runChecked(cmd, timeout: 30)
+        if let rows = Self.parseCodexListJSON(r.stdout) { return rows }
+        // 旧版 codex 不认识 --json 时退回表格解析
         return Self.parseCodexList(r.stdout).filter { row in
             let s = row.status.lowercased()
             return s.contains("installed") && !s.contains("not installed")
         }
     }
+
+    static func parseCodexListJSON(_ text: String) -> [(selector: String, status: String, version: String)]? {
+        guard let data = text.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let installed = root["installed"] as? [[String: Any]] else { return nil }
+        return installed.compactMap { e in
+            guard let id = e["pluginId"] as? String else { return nil }
+            let enabled = (e["enabled"] as? Bool ?? true) ? "installed, enabled" : "installed, disabled"
+            return (id, enabled, e["version"] as? String ?? "")
+        }
+    }
+
+    /// `codex plugin marketplace upgrade` 会联网，最多每 6 小时执行一次。
+    nonisolated(unsafe) private static var lastMarketplaceUpgrade: Date?
 
     private func checkCodex(_ keys: Set<String>, log: @escaping Logger) async -> [UpdateItem] {
         guard !keys.isEmpty else { return [] }
@@ -168,13 +187,30 @@ struct PluginProvider: UpdateProvider {
         }
         guard hasCodex else { return keys.sorted().map { unknown($0, "本机未安装 codex") } }
 
-        log("$ codex plugin marketplace upgrade", false)
-        if let r = try? await Shell.run(["codex", "plugin", "marketplace", "upgrade"], timeout: 300), !r.ok {
-            log("codex marketplace 刷新失败，使用本地快照", true)
+        if Self.lastMarketplaceUpgrade.map({ Date().timeIntervalSince($0) > 6 * 3600 }) ?? true {
+            log("$ codex plugin marketplace upgrade", false)
+            if let r = try? await Shell.run(["codex", "plugin", "marketplace", "upgrade"], timeout: 60), !r.ok {
+                log("codex marketplace 刷新失败或超时，使用本地快照", true)
+            }
+            Self.lastMarketplaceUpgrade = Date()
         }
-        let rows: [(selector: String, status: String, version: String)]
-        do { rows = try await codexInstalledRows(log: log) } catch {
-            return keys.sorted().map { unknown($0, "codex plugin list 失败: \(error.localizedDescription)") }
+        // 只查关注插件所属的 marketplace，避免拉取不相关的远程目录。
+        let marketplaces = Set(keys.map { Installed(host: .codex, selector: $0, version: nil).marketplace })
+        var rows: [(selector: String, status: String, version: String)] = []
+        var failures: [String] = []
+        await withTaskGroup(of: Result<[(selector: String, status: String, version: String)], Error>.self) { group in
+            for mkt in marketplaces {
+                group.addTask { do { return .success(try await self.codexInstalledRows(marketplace: mkt, log: log)) } catch { return .failure(error) } }
+            }
+            for await r in group {
+                switch r {
+                case .success(let list): rows += list
+                case .failure(let e): failures.append(e.localizedDescription)
+                }
+            }
+        }
+        if rows.isEmpty, let first = failures.first {
+            return keys.sorted().map { unknown($0, "codex plugin list 失败: \(first)") }
         }
         let byselector = Dictionary(rows.map { ($0.selector, $0) }, uniquingKeysWith: { a, _ in a })
         let hint = "Codex 暂无升级命令；可在终端执行 codex plugin add <plugin@mkt> 重新安装"

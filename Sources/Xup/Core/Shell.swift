@@ -187,7 +187,11 @@ enum Shell {
                 return
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                if p.isRunning { p.terminate() }
+                guard p.isRunning else { return }
+                p.terminate()
+                DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+                    if p.isRunning { kill(p.processIdentifier, SIGKILL) }
+                }
             }
         }
     }
