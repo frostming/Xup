@@ -55,6 +55,7 @@ struct MainWindow: View {
 
 struct SidebarView: View {
     @Environment(\.openSettings) private var openSettings
+    @State private var settingsHovered = false
     @EnvironmentObject private var center: UpdateCenter
     @EnvironmentObject private var history: UpdateHistory
     @EnvironmentObject private var ui: UIState
@@ -83,22 +84,30 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // 设置入口放在侧栏左下角（菜单栏面板不再提供"设置…"）。
-            HStack {
-                Button {
-                    XupActions.activate()
-                    openSettings()
-                } label: {
-                    Label("设置", systemImage: "gearshape")
-                        .labelStyle(.titleAndIcon)
+            // 设置入口放在侧栏左下角（菜单栏面板不再提供"设置…"），外观与侧栏行一致。
+            Button {
+                XupActions.activate()
+                openSettings()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "gearshape")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22)
+                    Text("设置")
+                        .font(.body)
+                    Spacer()
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .keyboardShortcut(",", modifiers: .command)
-                .help("打开设置（⌘,）")
-                Spacer()
+                .padding(.horizontal, 8)
+                .frame(height: 32)
+                .contentShape(RoundedRectangle(cornerRadius: 8))
+                .background(settingsHovered ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
             }
-            .padding(.horizontal, 16)
+            .buttonStyle(.plain)
+            .onHover { settingsHovered = $0 }
+            .keyboardShortcut(",", modifiers: .command)
+            .help("打开设置（⌘,）")
+            .padding(.horizontal, 10)
             .padding(.vertical, 10)
         }
         .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
