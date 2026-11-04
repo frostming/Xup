@@ -8,6 +8,8 @@
 	<string>Xup</string>
 	<key>CFBundleExecutable</key>
 	<string>Xup</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.fming.xup</string>
 	<key>CFBundleInfoDictionaryVersion</key>

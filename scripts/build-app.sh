@@ -39,6 +39,7 @@ cp "$CLI_BIN" "$CONTENTS/Helpers/xup"
 cp "$ROOT/Support/Info.plist" "$CONTENTS/Info.plist"
 cp "$ROOT/Support/config.schema.json" "$CONTENTS/Resources/config.schema.json"
 cp "$ROOT/Support/SKILL.md" "$CONTENTS/Resources/SKILL.md"
+cp "$ROOT/Support/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 
 echo "==> codesign (ad-hoc)"
