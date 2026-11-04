@@ -323,11 +323,6 @@ struct AppsSettings: View {
             .buttonStyle(.borderless)
             .padding(.vertical, 6)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Xup 会自动识别应用来自 Homebrew、Sparkle、electron-updater 还是 App Store，并用对应方式更新；识别不了的应用可点击行尾 › 手动配置 GitHub Releases、Tauri、electron-updater 或 Sparkle 来源。")
-                Text(AppRunningPolicy.explanation)
-            }
-            .font(.footnote).foregroundStyle(.secondary)
         }
         .padding(20)
         .sheet(item: $sourceSheetApp) { app in
