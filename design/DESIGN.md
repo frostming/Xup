@@ -270,7 +270,7 @@ Xup (MenuBarExtra, .window 样式)
 
 ## 7. 设置（Settings scene，TabView）
 
-> §21（2026-11-04）：设置窗口只剩 **通用 / Agents** 两个 Tab；§7.3"应用"与 §13.7"软件"Tab 已移入主窗口。
+> §21（2026-11-04）：设置窗口只剩 **通用（含 Agents 检测规则一节）** 两个 Tab；§7.3"应用"与 §13.7"软件"Tab 已移入主窗口。
 
 窗口固定宽 **520**，内容用 `Form` + `.formStyle(.grouped)`。Tab 图标：
 
@@ -884,5 +884,5 @@ Section「检查」内，原"发现更新时自动更新"位置：
 
 ### 21.4 设置窗口
 
-- 只保留 **通用 / Agents**（`SettingsTab = general | agents`），尺寸仍 620×520。`UIState.pickerKind` / `selectWatchTab` 删除。
+- 只保留 **通用（含 Agents 检测规则一节）**（`SettingsTab = general | agents`），尺寸仍 620×520。`UIState.pickerKind` / `selectWatchTab` 删除。
 - 菜单栏面板与 CLI 不变。

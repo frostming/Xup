@@ -9,23 +9,16 @@ struct SettingsView: View {
     static let tabSize = CGSize(width: 620, height: 520)
 
     var body: some View {
-        TabView(selection: $ui.settingsTab) {
-            GeneralSettings()
-                .frame(width: Self.tabSize.width, height: Self.tabSize.height)
-                .tabItem { Label("通用", systemImage: "gearshape") }
-                .tag(SettingsTab.general)
-            AgentsSettings()
-                .frame(width: Self.tabSize.width, height: Self.tabSize.height)
-                .tabItem { Label("Agents", systemImage: "cpu") }
-                .tag(SettingsTab.agents)
-        }
-        .background(WindowSnapshotHook("settings", delay: 1.5))
+        GeneralSettings()
+            .frame(width: Self.tabSize.width, height: Self.tabSize.height)
+            .background(WindowSnapshotHook("settings", delay: 1.5))
     }
 }
 
 // MARK: - 通用
 
 struct GeneralSettings: View {
+    @State private var confirmResetAgents = false
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var center: UpdateCenter
     @EnvironmentObject private var ui: UIState
@@ -178,6 +171,36 @@ struct GeneralSettings: View {
                 }
             }
 
+            Section("Agents 检测规则") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(AppSettings.agentSpecsURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                        .textSelection(.enabled)
+                    HStack {
+                        Button { XupActions.revealInFinder(AppSettings.agentSpecsURL.path) } label: {
+                            Label("在 Finder 中显示", systemImage: "folder")
+                        }
+                        Button { NSWorkspace.shared.open(AppSettings.agentSpecsURL) } label: {
+                            Label("用默认编辑器打开", systemImage: "square.and.pencil")
+                        }
+                        Button { _ = settings.loadAgentSpecs() } label: {
+                            Label("重新加载", systemImage: "arrow.clockwise")
+                        }
+                        Spacer()
+                        Button("恢复默认", role: .destructive) { confirmResetAgents = true }
+                    }
+                    if let err = settings.agentSpecsError {
+                        Label(err, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote).foregroundStyle(.red)
+                    } else {
+                        Text("内置 Claude Code、Codex、Gemini、OpenCode、Amp、Copilot、Cursor Agent 的检测规则；编辑 agents.json 可增删 agent 或修改更新命令。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             Section {
                 LabeledContent("跟踪的软件") {
                     HStack(spacing: 8) {
@@ -198,86 +221,15 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-    }
-}
-
-// MARK: - Agents
-
-struct AgentsSettings: View {
-    @EnvironmentObject private var settings: AppSettings
-    @State private var specs: [AgentSpec] = []
-    @State private var selected: AgentSpec.ID?
-    @State private var confirmReset = false
-
-    private var displayPath: String {
-        AppSettings.agentSpecsURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-    }
-
-    var body: some View {
-        Form {
-            Section {
-                Text("Xup 内置了 Claude Code、Codex CLI、Gemini CLI、OpenCode、Amp、GitHub Copilot CLI、Cursor Agent 的检测规则。你可以编辑 agents.json 来增删 agent 或修改更新命令。")
-                    .font(.callout)
-                if let err = settings.agentSpecsError {
-                    Label(err, systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote).foregroundStyle(.red)
-                }
-                Table(specs, selection: $selected) {
-                    TableColumn("名称") { s in Text(s.name) }.width(min: 90)
-                    TableColumn("二进制") { s in Text(s.binary).font(.system(.caption, design: .monospaced)) }.width(90)
-                    TableColumn("npm 包") { s in
-                        Text(s.npmPackage ?? "—").font(.system(.caption, design: .monospaced)).foregroundStyle(s.npmPackage == nil ? .secondary : .primary)
-                    }.width(min: 110)
-                    TableColumn("更新命令") { s in
-                        if let cmd = s.updateCommand, !cmd.isEmpty {
-                            Text(cmd.joined(separator: " ")).font(.system(.caption, design: .monospaced))
-                        } else {
-                            Text("— · 仅检测版本").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }.width(min: 120)
-                }
-                .frame(height: 220)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Button { XupActions.revealInFinder(AppSettings.agentSpecsURL.path) } label: {
-                            Label("在 Finder 中显示", systemImage: "folder")
-                        }
-                        Button { NSWorkspace.shared.open(AppSettings.agentSpecsURL) } label: {
-                            Label("用默认编辑器打开", systemImage: "square.and.pencil")
-                        }
-                        Button { reload() } label: {
-                            Label("重新加载", systemImage: "arrow.clockwise")
-                        }
-                    }
-                    HStack {
-                        Text(displayPath)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1).truncationMode(.middle)
-                            .textSelection(.enabled)
-                        Spacer()
-                        Button("恢复默认", role: .destructive) { confirmReset = true }
-                    }
-                }
+        .alert("恢复默认 agents.json？", isPresented: $confirmResetAgents) {
+            Button("恢复默认", role: .destructive) {
+                try? FileManager.default.removeItem(at: AppSettings.agentSpecsURL)
+                _ = settings.loadAgentSpecs()
             }
-        }
-        .formStyle(.grouped)
-        .onAppear { reload() }
-        .alert("恢复默认 agents.json？", isPresented: $confirmReset) {
-            Button("恢复默认", role: .destructive) { resetToDefault() }
             Button("取消", role: .cancel) {}
         } message: {
             Text("将覆盖你对 agents.json 的修改，恢复为内置的检测规则。")
         }
     }
-
-    private func reload() {
-        specs = settings.loadAgentSpecs()
-    }
-
-    private func resetToDefault() {
-        try? FileManager.default.removeItem(at: AppSettings.agentSpecsURL)
-        reload()
-    }
 }
+

@@ -24,7 +24,7 @@ enum SidebarItem: Hashable {
 
 /// 设置窗口的 Tab（§21：只剩 通用 / Agents；"软件"与"应用"管理移入主窗口）。
 enum SettingsTab: Hashable {
-    case general, agents
+    case general
 }
 
 /// §21 "添加要跟踪的软件" Sheet 的请求：目标来源 + 是否显示来源 Picker（"全部"分区打开时为 true）。
@@ -93,14 +93,13 @@ final class UIState: ObservableObject {
         if let raw = env["XUP_DEBUG_SIDEBAR"] {
             if raw == "history" { initialSidebar = .history } else if let k = ProviderKind(rawValue: raw) { initialSidebar = .kind(k) }
         }
-        // 调试：`XUP_DEBUG_SETTINGS=general|agents` 启动后自动打开设置窗口到指定 Tab；
+        // 调试：`XUP_DEBUG_SETTINGS=general` 启动后自动打开设置窗口到指定 Tab；
         // `XUP_DEBUG_SETTINGS=watch[:plugin]` 打开主窗口并弹出对应来源的添加 Sheet（不带来源时为"全部"分区的带 Picker 形态）；
         // `apps` 打开主窗口的应用分区（§21）。
         if let raw = env["XUP_DEBUG_SETTINGS"] {
             let parts = raw.split(separator: ":").map(String.init)
             switch parts.first {
             case "general": initialTab = .general; openSettings = true
-            case "agents": initialTab = .agents; openSettings = true
             case "watch":
                 if let k = (parts.count > 1 ? ProviderKind(rawValue: parts[1]) : nil), k != .app {
                     initialSidebar = .kind(k)
