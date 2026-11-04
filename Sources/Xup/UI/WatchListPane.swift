@@ -1,13 +1,11 @@
 import SwiftUI
 
-/// §13 "选择软件…" Sheet：560×480，分段 Picker + 搜索，每段独立加载并缓存。
-struct WatchPickerSheet: View {
-    let initialKind: ProviderKind
-
+/// §13.7 设置 › 软件：原"选择软件…"Sheet 的主体并入设置窗口。分段 Picker + 搜索，每段独立加载并缓存；
+/// 勾选即时写入关注列表（300ms 去抖），底部"立即检查"触发一次检查。
+struct WatchListPane: View {
     @EnvironmentObject private var center: UpdateCenter
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var ui: UIState
-    @Environment(\.dismiss) private var dismiss
 
     private enum LoadState {
         case loading
@@ -21,6 +19,8 @@ struct WatchPickerSheet: View {
     @State private var selections: [ProviderKind: Set<String>] = [:]
     @State private var states: [ProviderKind: LoadState] = [:]
     @State private var loadTasks: [ProviderKind: Task<Void, Never>] = [:]
+    /// 去抖写入关注列表的任务（按分段）。
+    @State private var commitTasks: [ProviderKind: Task<Void, Never>] = [:]
     @FocusState private var searchFocused: Bool
 
     // MARK: 派生
@@ -44,7 +44,7 @@ struct WatchPickerSheet: View {
     private var isUnavailable: Bool { if case .unavailable? = states[segment] { return true } else { return false } }
 
     private var countText: String {
-        var s = "已选 \(selected.count) 项"
+        var s = "已关注 \(selected.count) 项"
         if isLoaded {
             s += " · 共 \(entries.count) 项"
             if isSearching { s += "（显示 \(filtered.count) 项）" }
@@ -67,17 +67,30 @@ struct WatchPickerSheet: View {
             Divider()
             footer
         }
-        .frame(width: 560, height: 480)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            segment = initialKind
+            segment = ui.pickerKind
             selections = settings.tracked
+            ui.hasSeenWatchPicker = true
             load(segment)
+        }
+        .onChange(of: ui.pickerKind) { _, k in
+            // 其它入口（工具栏 / 空状态）在设置窗口已打开时再次定位分段。
+            segment = k
         }
         .onChange(of: segment) { _, k in
             load(k)
         }
+        .onChange(of: settings.tracked) { _, t in
+            // 外部修改（右键"取消关注"、CLI）同步到勾选；本视图的写入回流时内容一致，无副作用。
+            for kind in ProviderKind.pickerOrder where commitTasks[kind] == nil {
+                selections[kind] = t[kind] ?? []
+            }
+        }
         .onDisappear {
             loadTasks.values.forEach { $0.cancel() }
+            // 还没落盘的去抖写入立即提交。
+            for kind in commitTasks.keys { flush(kind) }
         }
     }
 
@@ -85,46 +98,62 @@ struct WatchPickerSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("选择要跟踪的软件").font(.headline)
-                Text("只有勾选的条目会被检查和更新。之后可随时在工具栏“选择软件…”中修改。")
+                Text("只有勾选的条目会被检查和更新。勾选即时生效；改完可点“立即检查”。")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            HStack(spacing: 10) {
-                Picker("来源", selection: $segment) {
-                    ForEach(ProviderKind.pickerOrder) { kind in
-                        Text(kind.title)
-                            .foregroundStyle(isUnavailable(kind) ? .tertiary : .primary)
-                            .help(isUnavailable(kind) ? "未检测到 \(kind.title)" : kind.title)
-                            .tag(kind)
-                    }
+            // 分段控件保持固有宽度；放不下时搜索框换到下一行。
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    segmentPicker
+                    Spacer(minLength: 0)
+                    searchField
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.small)
-                .layoutPriority(1)
-
-                HStack(spacing: 4) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary).imageScale(.small)
-                    TextField("搜索", text: $query)
-                        .textFieldStyle(.plain)
-                        .focused($searchFocused)
-                    if !query.isEmpty {
-                        Button { query = "" } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).imageScale(.small)
-                        }
-                        .buttonStyle(.plain)
-                        .help("清除")
-                    }
+                VStack(alignment: .leading, spacing: 8) {
+                    segmentPicker
+                    searchField
                 }
-                .padding(.horizontal, 6)
-                .frame(height: 22)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
-                .frame(minWidth: 120, maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+
+    private var segmentPicker: some View {
+        Picker("来源", selection: $segment) {
+            ForEach(ProviderKind.pickerOrder) { kind in
+                Text(kind.title)
+                    .foregroundStyle(isUnavailable(kind) ? .tertiary : .primary)
+                    .help(isUnavailable(kind) ? "未检测到 \(kind.title)" : kind.title)
+                    .tag(kind)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .fixedSize()
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).imageScale(.small)
+            TextField("搜索", text: $query)
+                .textFieldStyle(.plain)
+                .focused($searchFocused)
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).imageScale(.small)
+                }
+                .buttonStyle(.plain)
+                .help("清除")
+            }
+        }
+        .padding(.horizontal, 6)
+        .frame(height: 22)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
+        .frame(minWidth: 160, maxWidth: 240)
     }
 
     @ViewBuilder private var listArea: some View {
@@ -153,7 +182,7 @@ struct WatchPickerSheet: View {
             } else {
                 List(filtered) { entry in
                     row(entry)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                 }
                 .listStyle(.plain)
                 .alternatingRowBackgrounds()
@@ -211,15 +240,18 @@ struct WatchPickerSheet: View {
                 .disabled(filtered.isEmpty)
             Text(countText).font(.caption).foregroundStyle(.secondary)
             Spacer()
-            Button("取消") { cancel() }
-                .keyboardShortcut(.cancelAction)
-            Button("完成") { finish() }
+            if center.isChecking {
+                ProgressView().controlSize(.small)
+                Text("正在检查…").font(.caption).foregroundStyle(.secondary)
+            }
+            Button("立即检查") { checkNow() }
                 .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(states.values.contains { if case .loading = $0 { return true } else { return false } })
+                .disabled(center.isChecking || settings.tracked.values.allSatisfy(\.isEmpty))
+                .help("按当前关注列表检查一次更新")
         }
-        .controlSize(.large)
+        .controlSize(.regular)
         .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity)
         .frame(height: 48)
     }
 
@@ -229,6 +261,7 @@ struct WatchPickerSheet: View {
         var s = selections[segment] ?? []
         if on { s.insert(name) } else { s.remove(name) }
         selections[segment] = s
+        scheduleCommit(segment)
     }
 
     /// 全选 / 清空只作用于当前过滤结果。
@@ -237,6 +270,31 @@ struct WatchPickerSheet: View {
         let names = filtered.map(\.name)
         if all { s.formUnion(names) } else { s.subtract(names) }
         selections[segment] = s
+        scheduleCommit(segment)
+    }
+
+    /// 勾选即时生效：300ms 去抖后写入 `settings.setTracked`，连续点击只落盘一次。
+    private func scheduleCommit(_ kind: ProviderKind) {
+        commitTasks[kind]?.cancel()
+        commitTasks[kind] = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            flush(kind)
+        }
+    }
+
+    private func flush(_ kind: ProviderKind) {
+        commitTasks[kind]?.cancel()
+        commitTasks[kind] = nil
+        let names = selections[kind] ?? []
+        if names != (settings.tracked[kind] ?? []) {
+            settings.setTracked(kind, names: names)
+        }
+    }
+
+    private func checkNow() {
+        for kind in commitTasks.keys { flush(kind) }
+        ui.check(center: center)
     }
 
     private func load(_ kind: ProviderKind) {
@@ -265,19 +323,5 @@ struct WatchPickerSheet: View {
                 }
             }
         }
-    }
-
-    private func cancel() {
-        ui.hasSeenWatchPicker = true
-        dismiss()
-    }
-
-    private func finish() {
-        for kind in ProviderKind.pickerOrder {
-            settings.setTracked(kind, names: selections[kind] ?? [])
-        }
-        ui.hasSeenWatchPicker = true
-        dismiss()
-        ui.checkAfterCurrent(center: center)
     }
 }

@@ -6,6 +6,7 @@ struct MainWindow: View {
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openSettings) private var debugOpenSettings
 
     var body: some View {
         NavigationSplitView {
@@ -15,13 +16,14 @@ struct MainWindow: View {
         }
         .frame(minWidth: 760, minHeight: 480)
         .background(WindowSnapshotHook("main"))
-        .sheet(isPresented: $ui.showWatchPicker) {
-            WatchPickerSheet(initialKind: ui.watchPickerKind)
-        }
         .sheet(item: $ui.sourceSheetApp) { app in
             AppSourceSheet(app: app)
         }
         .onAppear {
+            if ui.debugOpenSettings {
+                ui.debugOpenSettings = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { XupActions.activate(); debugOpenSettings() }
+            }
             NSLog("[Xup] MainWindow appeared, requested=\(ui.mainWindowRequested)")
             // 纯菜单栏应用：macOS 14 上随启动自动打开的主窗口若非明确请求（非首次启动），立即关闭。
             if !ui.mainWindowRequested && !ui.openMainWindowOnLaunch {
@@ -30,13 +32,7 @@ struct MainWindow: View {
             }
             ui.mainWindowRequested = true
             if ui.openMainWindowOnLaunch { XupActions.activate() }
-            // §13.5 首启引导：窗口出现 0.3s 后自动弹出 Sheet。
-            if !ui.debugOpenWindow, !ui.onboardingAttempted, ui.needsOnboarding(settings) {
-                ui.onboardingAttempted = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    if ui.needsOnboarding(settings) { ui.presentWatchPicker(kind: .homebrew) }
-                }
-            }
+            // §13.7 首启引导不再自动弹 Sheet：欢迎态主按钮引导用户打开 设置 › 软件。
         }
     }
 }
@@ -93,6 +89,7 @@ struct DetailView: View {
     @EnvironmentObject private var center: UpdateCenter
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var ui: UIState
+    @Environment(\.openSettings) private var openSettings
 
     @State private var pendingConfirm: PendingUpdate?
 
@@ -172,11 +169,11 @@ struct DetailView: View {
         } else if kind == .app, settings.managedApps.isEmpty {
             EmptyStates.NoApps(addApps: addApps)
         } else if let kind, center.untrackedKinds.contains(kind) {
-            EmptyStates.Untracked(kind: kind) { ui.presentWatchPicker(kind: kind) }
+            EmptyStates.Untracked(kind: kind) { openWatchList(kind: kind) }
         } else if kind == nil, allSourcesUnavailable, settings.managedApps.isEmpty {
             EmptyStates.NoSources(addApps: addApps)
         } else if kind == nil, nothingTracked {
-            EmptyStates.Welcome(pick: { ui.presentWatchPicker(kind: nil) }, addApps: addApps)
+            EmptyStates.Welcome(pick: { openWatchList(kind: nil) }, addApps: addApps)
         } else if center.isChecking, baseItems.isEmpty {
             EmptyStates.Checking(sources: ProviderKind.sidebarOrder.filter { !center.unavailable.contains($0) && !center.untrackedKinds.contains($0) }.map(\.title))
         } else if center.lastChecked == nil, center.items.isEmpty {
@@ -184,7 +181,7 @@ struct DetailView: View {
         } else if let kind, let err = center.providerErrors[kind], baseItems.isEmpty {
             EmptyStates.ProviderFailed(kind: kind, message: err) { ui.check(center: center) }
         } else if items.isEmpty, !ui.search.isEmpty {
-            EmptyStates.NoResults(query: ui.search, clear: { ui.search = "" }, pick: { ui.presentWatchPicker(kind: kind) })
+            EmptyStates.NoResults(query: ui.search, clear: { ui.search = "" }, pick: { openWatchList(kind: kind) })
         } else if items.isEmpty {
             EmptyStates.AllUpToDate(total: center.items.filter { kind == nil || $0.kind == kind }.count,
                                     lastChecked: center.lastChecked) { ui.check(center: center) }
@@ -193,6 +190,13 @@ struct DetailView: View {
                 .padding(.leading, 8)
                 .background(Color(nsColor: .controlBackgroundColor))
         }
+    }
+
+    /// §13.7：所有"选择软件…"入口都打开 设置 › 软件 并定位到对应来源分段。
+    private func openWatchList(kind: ProviderKind?) {
+        ui.selectWatchTab(kind: kind)
+        XupActions.activate()
+        openSettings()
     }
 
     private var allSourcesUnavailable: Bool {
@@ -232,8 +236,8 @@ struct DetailView: View {
                     .help("添加应用… (⌘N)")
                     .keyboardShortcut("n", modifiers: .command)
             } else {
-                Button { ui.presentWatchPicker(kind: kind) } label: { Label("选择软件…", systemImage: "checklist") }
-                    .help("选择要跟踪的软件 (⇧⌘N)")
+                Button { openWatchList(kind: kind) } label: { Label("选择软件…", systemImage: "checklist") }
+                    .help("在设置 › 软件中选择要跟踪的软件 (⇧⌘N)")
                     .disabled(isUpdating)
                     .keyboardShortcut("n", modifiers: [.command, .shift])
             }

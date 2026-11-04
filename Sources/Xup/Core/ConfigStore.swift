@@ -750,7 +750,7 @@ enum ConfigSchema {
           "restartAfterUpdate": {
             "type": "boolean",
             "default": true,
-            "description": "更新完成后重新启动该应用。Relaunch the app after updating."
+            "description": "应用正在运行时的处理：true = 自动退出并重新打开（默认）；false = 跳过本次更新，等用户关闭后再更新。If the app is running: true = quit it and relaunch after updating (default); false = skip this update until the user quits the app."
           },
           "source": {
             "description": "手动指定的更新来源；null 或省略表示自动识别（Homebrew cask > Sparkle > electron-updater > App Store）。Manual update source; null = auto-detect.",

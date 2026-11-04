@@ -22,6 +22,8 @@ let usage = """
   track remove <kind>:<name>...     取消关注
   apps list                         列出受管应用
   apps add <path> [--restart|--no-restart] [--source <spec>]
+                                    --restart（默认）：更新时应用若在运行，自动退出并重新打开
+                                    --no-restart：应用在运行就跳过本次更新，等用户关闭后再更新
   apps remove <path>...
   apps set-source <path> <spec>     spec：github:owner/repo[#pattern] | tauri:<url> | electron:<url> | appcast:<url> | auto
 
@@ -222,7 +224,7 @@ func cmdApps(_ a: Args) throws {
         let apps = ConfigFile.apps(cfg)
         emit(apps) {
             apps.isEmpty ? "没有受管应用（xup apps add <path>）" :
-                table(["路径", "更新后重启", "来源"], apps.map { [str($0, "path"), ($0["restartAfterUpdate"] as? Bool ?? true) ? "是" : "否", ConfigFile.describeSource($0["source"])] })
+                table(["路径", "应用运行时", "来源"], apps.map { [str($0, "path"), ($0["restartAfterUpdate"] as? Bool ?? true) ? "自动退出并重新打开" : "等用户关闭后再更新", ConfigFile.describeSource($0["source"])] })
         }
     case "add":
         guard let raw = a[2] else { throw usageError("用法：xup apps add <path> [--restart|--no-restart] [--source <spec>]") }

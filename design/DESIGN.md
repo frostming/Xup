@@ -61,7 +61,7 @@ Xup (MenuBarExtra, .window 样式)
 | `canUpdate == false` | 行内更新按钮禁用；全选/全部更新时自动跳过 |
 | `hint` | 状态文字后以 `·` 分隔追加，`.caption` `.tertiary`，如 `已 pin，跳过` |
 | `isActionable` | 决定是否被"全部更新"和复选框计入 |
-| `ManagedApp.restartAfterUpdate` | 应用分区每行一个开关（Toggle）；设置 › 应用 中也可改 |
+| `ManagedApp.restartAfterUpdate` | 界面上呈现为"应用运行时…"二选一（§17）：右键子菜单 / 设置 › 应用 的 Picker |
 | `LogLine` | 日志面板一行：时间 · 来源 tag · 文本；`isError` 为红色 |
 
 ---
@@ -435,6 +435,14 @@ Xup (MenuBarExtra, .window 样式)
 - **状态栏**：分区视图左侧文案追加跟踪比例，如 `共 5 项 · 2 个可更新 · 跟踪 5 / 12 个已安装 skill`，让用户知道还有未关注的条目。"全部"视图不显示比例。
 - **搜索**：主窗口搜索只过滤已关注条目；搜不到时 6.6 空状态的描述追加一行链接"在'选择软件…'中查找已安装但未跟踪的条目"。
 
+### 13.7 Sheet 并入设置窗口（2026-11-04 变更）
+
+- "选择软件…"不再是主窗口的 Sheet，而是**设置窗口的"软件"Tab**（symbol `checklist`，位于"通用"之后、"Agents"之前；视图 `WatchListPane`，文件 `WatchListPane.swift`）。内容即原 §13.2 主体：来源分段控件 + 搜索框 + 已安装清单（checkbox · 名称 · detail · 版本）+ 底部 全选 / 清空 / `已关注 N 项 · 共 M 项`；每段独立加载并缓存，四态（加载中 / 为空 / 读取失败 / 不可用）不变。设置窗口四个 Tab 统一 **620 × 520**（`SettingsView.tabSize`，各 Tab 根视图 `.frame(width:height:)`，避免 TabView 按内容宽度居中后溢出裁切）；该 Tab 根布局 `.frame(maxWidth: .infinity, maxHeight: .infinity)`，头部 `.padding(.horizontal, 20)`，分段控件 `.fixedSize()` 与搜索框（`minWidth 160, maxWidth 240`）同一行、放不下时用 `ViewThatFits` 换行；列表行左右内边距 16，底部工具条与列表同宽。
+- **勾选即时生效**：切换 checkbox / 全选 / 清空 后 300ms 去抖写入 `settings.setTracked(kind, names:)`；没有"取消 / 完成"按钮。底部右侧 **`立即检查`**（`.borderedProminent`）调用 `center.checkAll()`，检查中禁用并在左侧显示进度与"正在检查…"。外部改动（右键"取消关注"、CLI）会同步回勾选。
+- 入口全部改为打开设置的"软件"Tab 并定位到对应来源分段：主窗口工具栏"选择软件…"（⇧⌘N）、§6.9 空状态按钮、§6.6 搜索无结果链接、设置 › 通用 的"选择软件…"按钮。实现：`UIState.settingsTab: SettingsTab`（`general / watch / agents / apps`）与 `UIState.pickerKind` 两个发布属性，`SettingsView` 的 `TabView(selection:)` 绑定 `settingsTab`；视图内先 `XupActions.activate()` 再 `@Environment(\.openSettings)`。
+- 首启引导（§13.5）：`tracked` 全空且 `hasSeenWatchPicker == false` 时**不再自动弹 Sheet**；主窗口欢迎态改为标题"先选择要跟踪的软件"，描述"Xup 只会检查和更新你勾选的条目。在 设置 › 软件 中勾选，勾选即时生效。"，主按钮 `打开设置 › 软件…`。"软件"Tab 首次出现时写 `hasSeenWatchPicker = true`。
+- `.sheet(isPresented: $ui.showWatchPicker)` 挂载与 `showWatchPicker / watchPickerKind / presentWatchPicker / checkAfterCurrent / onboardingAttempted` 一并删除。§13.6 "设置：不新增 Tab"作废。
+
 ---
 
 ## 14. Skills 与插件来源（2026-11-04 新增）
@@ -620,3 +628,13 @@ struct ManagedApp { …; var customSource: AppUpdateSource?; var detectedSource:
 - `customSource` 随 `ManagedApp` 一起存在 `AppSettings.apps`（UserDefaults，与 §15 对齐），移除应用时一并删除。
 - 配置了来源但对应 App 已被删除：行沿用 §13.1"本机已卸载"文案，配置保留，直到用户移除该行。
 - 下载替换流程复用 §4.1 步骤 4 的阶段文案（下载中 → 校验中 → 解压中 → 替换中 → 重启中）；GitHub / Tauri 来源的"校验中"只校验文件长度（无签名），electron-updater 校验 sha512，Sparkle 校验 EdDSA。签名缺失不算失败，但日志里记一行 `[app] 该来源不提供签名，仅校验长度`。
+
+## 17. "更新后重启"改为"应用运行时的处理方式"（2026-11-04 文案与落点变更）
+
+- 问题：应用分区每行的"更新后重启"Toggle 用户看不懂。它的真实语义是"应用正在运行时怎么办"：开 = 替换前自动退出、替换后自动重开；关 = 应用在运行就跳过本次更新，等用户关闭后再更新。
+- 改法（仅 UI，`ManagedApp.restartAfterUpdate` 字段与 config 键不变）：两个选项固定为 **`自动退出并重新打开`**（true，默认）/ **`等我关闭后再更新`**（false），**只在每个应用自己的配置 Sheet 里修改**，不再散落在表格行 / 右键子菜单 / 设置列表。
+  - **"应用设置"Sheet**（原 §16.3 "配置更新来源"升级，`AppSourceSheet`）：标题 `配置 <应用名>`；两个分组：「应用正在运行时」`Picker` `.radioGroup` 两选项 + 一句 `.caption .secondary` 说明；「更新来源」为原有的来源类型 / 字段 / 测试 / 移除配置。"保存"同时写 `setRestart` 与 `setSource`；来源字段没填过时只保存策略（不触发重新检查）。自更新行该 Picker `.disabled`。
+  - 表格"应用"分区：操作列不再有 Toggle（宽度回到 84）；行副标题不显示策略；右键菜单 `配置更新来源…` 改名 **`配置应用…`**（`slider.horizontal.3`）。
+  - 设置 › 应用：行尾 Toggle 换为只读简述 `运行中自动重开` / `运行中跳过`（`.caption .secondary`，自更新行不显示）；点击行或 `›` 打开同一个"应用设置"Sheet；列表下方追加一句脚注解释两种策略；§7.2"自动更新"脚注改为"应用分区仍遵循每个应用的'运行中处理方式'"。
+  - 状态列：策略为"等我关闭后再更新"且应用正在运行且有新版本时，hint 显示 `应用运行中，按设置暂不更新；关闭后点"更新"，或在"配置应用…"里改为自动退出并重新打开`；AppsProvider 对应日志 / 抛错用其简短版。
+  - schema `restartAfterUpdate.description`、SKILL.md、README、`xup apps add --restart/--no-restart` 帮助同步为上述两句含义。§4.2 / §7.3 / §16.4 / §16.5 中提到的"更新后重启"开关均以本节为准。

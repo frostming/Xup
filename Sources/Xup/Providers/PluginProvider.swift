@@ -151,7 +151,9 @@ struct PluginProvider: UpdateProvider {
     }
 
     private func codexInstalledRows(log: @escaping Logger) async throws -> [(selector: String, status: String, version: String)] {
-        let r = try await Shell.runChecked(["codex", "plugin", "list"], timeout: 120)
+        // `codex plugin list` 会联网刷新远程 marketplace，网络慢时很久不返回；这里限 25 秒，超时按失败处理（界面仍能显示 Claude 插件）。
+        log("读取 Codex 插件列表（codex plugin list，需联网，可能要十几秒）…", false)
+        let r = try await Shell.runChecked(["codex", "plugin", "list"], timeout: 25)
         return Self.parseCodexList(r.stdout).filter { row in
             let s = row.status.lowercased()
             return s.contains("installed") && !s.contains("not installed")

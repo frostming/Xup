@@ -10,7 +10,7 @@ macOS 菜单栏常驻的统一更新器。只检查、只更新你**关注**（�
 | Agents（claude / codex / gemini / opencode / amp / copilot / cursor-agent…） | `<bin> --version` 对比 npm registry；表在 `~/Library/Application Support/Xup/agents.json` 可自行扩展 | 各自的自更新命令（如 `claude update`），由 brew/npm/uv 安装的归入对应来源 |
 | Skills（Vercel `skills` CLI） | `~/.agents/.skill-lock.json` + GitHub 该目录是否有新提交 | `npx skills update <name> -g -y` |
 | 插件 | Claude Code：`installed_plugins.json` 对比 marketplace；Codex：`codex plugin list` | `claude plugin update -y <name@mkt>`；Codex 暂只检测 |
-| 应用（/Applications） | 手动配置来源 > Homebrew cask > Sparkle appcast > electron-updater (`app-update.yml`) > App Store(`mas`) > 由应用自更新 | cask：brew；Sparkle / electron / 自定义：下载 zip/dmg/tar，校验签名后原地替换，必要时请求管理员权限；可选"更新后重启" |
+| 应用（/Applications） | 手动配置来源 > Homebrew cask > Sparkle appcast > electron-updater (`app-update.yml`) > App Store(`mas`) > 由应用自更新 | cask：brew；Sparkle / electron / 自定义：下载 zip/dmg/tar，校验签名后原地替换，必要时请求管理员权限；每个应用可选"运行中处理方式"：自动退出并重新打开（默认）/ 等用户关闭后再更新（`restartAfterUpdate`） |
 
 手动来源支持：GitHub Releases（owner/repo，可选资源名通配）、Tauri 更新 JSON、electron-updater `latest-mac.yml`、Sparkle appcast。
 

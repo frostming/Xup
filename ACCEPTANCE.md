@@ -69,3 +69,9 @@
 - [x] 非法字段、类型错误、未带 --yes 的 update 均被拒绝（exit 1）
 - [x] SKILL.md 已安装到 ~/.agents/skills/xup 与 ~/.claude/skills/xup
 - [x] 目标名 Xup/xup 大小写冲突：CLI 目标改名 xup-cli，二进制放 Contents/Helpers/xup
+
+## K. Alma 重启失败根因（2026-11-04 12:45 定位）
+- 用户在 App 内点更新：增量下载 54.6 MB / 11.8 s，sha512 通过，替换成功 0.4.414 → 0.4.422；但重启 3 次均失败。
+- 复现实验：Alma 被 `terminate()` 优雅退出后，LaunchServices 立刻残留其注册（lsappinfo 显示已死 pid）。此时 `open -a`、`NSWorkspace.open(url)`、`openApplication(createsNewApplicationInstance:)` 全部让新进程在 100 ms 内以 0 退出；而 Finder 的打开（`tell application "Finder" to open POSIX file`）能成功，且系统日志出现 `kLSNotifyApplicationExitedIncludingSubordinateProcesses` 清掉旧 ASN。
+- 推断：Alma 退出时留下过继给 launchd 的子进程（chrome_crashpad_handler、lark-cli），LS 把它们算作"subordinate processes"，认为应用仍在运行。
+- 修复：重启在 openApplication 失败后改走 Finder 打开路径；替换前额外清理可执行文件位于该 .app 内的所有遗留进程（不限于 NSRunningApplication）。

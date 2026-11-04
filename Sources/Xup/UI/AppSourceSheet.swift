@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// §16.3 配置更新来源 Sheet（宽 440）。
+/// §16.3 / §17 "应用设置" Sheet（宽 440）：「应用正在运行时」策略 + 「更新来源」配置。
 struct AppSourceSheet: View {
     let app: ManagedApp
 
@@ -55,10 +55,25 @@ struct AppSourceSheet: View {
     @State private var urls: [SourceType: String] = [:]
     @State private var test: TestState = .idle
     @State private var testTask: Task<Void, Never>?
+    /// §17 应用正在运行时的处理方式（映射 `restartAfterUpdate`）。
+    @State private var policy: AppRunningPolicy = .relaunch
 
     private var item: UpdateItem? { center.items.first { $0.id == "app:\(app.path)" } }
     private var installed: String { item?.installed ?? "?" }
     private var hasExisting: Bool { app.source != nil }
+    private var selfUpdating: Bool { item?.isSelfUpdating ?? false }
+    private var policyChanged: Bool { policy.restartAfterUpdate != app.restartAfterUpdate }
+    /// 用户是否填写过来源字段（或本来就有配置）；没有的话"保存"只写策略。
+    private var sourceTouched: Bool {
+        hasExisting || !repo.trimmingCharacters(in: .whitespaces).isEmpty
+            || !assetPattern.trimmingCharacters(in: .whitespaces).isEmpty
+            || urls.values.contains { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+    private var canSave: Bool {
+        guard test != .running else { return false }
+        if sourceTouched { return fieldsValid }
+        return policyChanged
+    }
 
     private var urlText: Binding<String> {
         Binding(get: { urls[type] ?? "" }, set: { urls[type] = $0 })
@@ -127,7 +142,23 @@ struct AppSourceSheet: View {
             header
             Divider()
             Form {
-                Picker("来源类型", selection: $type) {
+                // §17 应用正在运行时
+                LabeledContent("应用正在运行时") {
+                    Picker("", selection: $policy) {
+                        ForEach(AppRunningPolicy.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.radioGroup)
+                    .labelsHidden()
+                    .disabled(selfUpdating)
+                }
+                Text(selfUpdating ? "由应用自更新，Xup 不替它更新，此项无效。" : policy.tooltip)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider().padding(.vertical, 4)
+
+                // §16.3 更新来源
+                Picker("更新来源", selection: $type) {
                     ForEach(SourceType.allCases) { t in Text(t.title).tag(t) }
                 }
                 .pickerStyle(.menu)
@@ -163,7 +194,7 @@ struct AppSourceSheet: View {
             Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
                 .resizable().frame(width: 32, height: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text("配置 \(app.name) 的更新来源").font(.headline)
+                Text("配置 \(app.name)").font(.headline)
                 Text("\(app.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) · 已安装 \(installed)")
                     .font(.caption).monospaced().foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
@@ -364,7 +395,7 @@ struct AppSourceSheet: View {
             Button("保存") { save() }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
-                .disabled(!fieldsValid || test == .running)
+                .disabled(!canSave)
         }
         .padding(.horizontal, 16)
         .frame(height: 50)
@@ -373,6 +404,7 @@ struct AppSourceSheet: View {
     // MARK: 动作
 
     private func load() {
+        policy = AppRunningPolicy(restartAfterUpdate: app.restartAfterUpdate)
         switch app.source {
         case .githubReleases(let r, let p):
             type = .github; repo = r; assetPattern = p ?? ""
@@ -405,12 +437,19 @@ struct AppSourceSheet: View {
         }
     }
 
+    /// 同时写入运行时策略与来源；来源字段没动过时只保存策略（不触发重新检查）。
     private func save() {
-        guard let source = builtSource else { return }
         testTask?.cancel()
-        settings.setSource(path: app.path, source)
-        dismiss()
-        Task { await center.checkAll() }
+        if policyChanged { settings.setRestart(path: app.path, policy.restartAfterUpdate) }
+        if sourceTouched {
+            guard let source = builtSource else { return }
+            let changed = source != app.source
+            settings.setSource(path: app.path, source)
+            dismiss()
+            if changed { Task { await center.checkAll() } }
+        } else {
+            dismiss()
+        }
     }
 }
 

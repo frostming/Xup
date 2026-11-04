@@ -106,7 +106,7 @@ xup apps probe-source /Applications/Kaze.app "github:owner/kaze#*arm64*.dmg" --j
 xup config get check.intervalMinutes
 xup config set check.intervalMinutes 720
 xup config set homebrew.greedy true
-xup config set apps.0.restartAfterUpdate false
+xup config set apps.0.restartAfterUpdate false   # 应用在运行时：false = 跳过本次更新等用户关闭，true（默认）= 自动退出并重新打开
 ```
 
 查看状态与日志：

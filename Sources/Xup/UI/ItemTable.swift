@@ -50,14 +50,14 @@ struct ItemTable: View {
             .width(96)
 
             TableColumn("状态", value: \.statusRank) { item in
-                StatusBadge(item: item)
+                StatusBadge(item: withRunningPolicyHint(item))
             }
             .width(150)
 
             TableColumn("操作") { item in
                 actionCell(item)
             }
-            .width(kind == .app || kind == nil ? 136 : 84)
+            .width(84)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .contextMenu(forSelectionType: String.self) { ids in
@@ -152,19 +152,22 @@ struct ItemTable: View {
             default:
                 EmptyView()
             }
-            if item.kind == .app, !item.isSelfUpdating, let path = item.appPath,
-               let app = settings.managedApps.first(where: { $0.path == path }) {
-                Spacer(minLength: 0)
-                Toggle("更新后重启", isOn: Binding(
-                    get: { app.restartAfterUpdate },
-                    set: { settings.setRestart(path: path, $0) }
-                ))
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .labelsHidden()
-                .help("更新后重启 \(item.name)")
-            }
         }
+    }
+
+    /// 非自更新的应用行对应的"运行中处理方式"；其它分区返回 nil。
+    private func runningPolicy(for item: UpdateItem) -> AppRunningPolicy? {
+        guard item.kind == .app, !item.isSelfUpdating, let app = managedApp(for: item) else { return nil }
+        return AppRunningPolicy(restartAfterUpdate: app.restartAfterUpdate)
+    }
+
+    /// §17：策略为"等我关闭后再更新"、应用正在运行且有新版本时，状态列补一句提示。
+    private func withRunningPolicyHint(_ item: UpdateItem) -> UpdateItem {
+        guard item.status.isOutdated, item.canUpdate, runningPolicy(for: item) == .waitForQuit,
+              let path = item.appPath, AppRunningPolicy.isRunning(appPath: path) else { return item }
+        var copy = item
+        copy.hint = AppRunningPolicy.skippedWhileRunningHint
+        return copy
     }
 
     /// 应用条目对应的 ManagedApp（path = id 去掉 "app:" 前缀）。
@@ -181,11 +184,11 @@ struct ItemTable: View {
         Button("更新") { onUpdate(Set(updatable.map(\.id))) }
             .disabled(updatable.isEmpty || !center.updatingIDs.isEmpty)
         if selected.count == 1, let single = selected.first, let app = managedApp(for: single) {
-            // §16.3 / §16.4：应用行的"启动应用"（仅自更新行）与"配置更新来源…"。
+            // §16.3 / §16.4 / §17：应用行的"启动应用"（仅自更新行）与"配置应用…"（运行时策略 + 更新来源）。
             if single.isSelfUpdating {
                 Button { Task { await center.launch(app) } } label: { Label("启动应用", systemImage: "play.circle") }
             }
-            Button { ui.presentSourceSheet(for: app) } label: { Label("配置更新来源…", systemImage: "slider.horizontal.3") }
+            Button { ui.presentSourceSheet(for: app) } label: { Label("配置应用…", systemImage: "slider.horizontal.3") }
         }
         if selected.count == 1, let path = selected.first?.filePath {
             Button("在 Finder 中显示") { XupActions.revealInFinder(path) }

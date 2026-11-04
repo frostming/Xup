@@ -8,11 +8,11 @@ enum EmptyStates {
         let addApps: () -> Void
         var body: some View {
             ContentUnavailableView {
-                Label("欢迎使用 Xup", systemImage: "arrow.up.circle")
+                Label("先选择要跟踪的软件", systemImage: "arrow.up.circle")
             } description: {
-                Text("先选择要让 Xup 跟踪的软件。Xup 只会检查和更新你勾选的条目。")
+                Text("Xup 只会检查和更新你勾选的条目。在 设置 › 软件 中勾选，勾选即时生效。")
             } actions: {
-                Button(action: pick) { Label("选择软件…", systemImage: "checklist") }
+                Button(action: pick) { Label("打开设置 › 软件…", systemImage: "checklist") }
                     .buttonStyle(.borderedProminent)
                 Button("添加应用…", action: addApps).buttonStyle(.link)
             }

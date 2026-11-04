@@ -14,6 +14,11 @@ enum SidebarItem: Hashable {
     var title: String { kind?.title ?? "全部" }
 }
 
+/// 设置窗口的 Tab（§13.7：原"选择软件…"Sheet 并入为"软件"Tab）。
+enum SettingsTab: Hashable {
+    case general, watch, agents, apps
+}
+
 /// 一轮由界面发起的更新。
 struct UpdateBatch: Equatable {
     let ids: Set<String>
@@ -37,18 +42,17 @@ final class UIState: ObservableObject {
     @Published var batch: UpdateBatch?
     /// 批次结束后短暂显示的汇总（失败数 > 0 时红色）。
     @Published var completion: (text: String, failed: Bool)?
-    /// §13 "选择软件…" Sheet 的显隐与初始分段。
-    @Published var showWatchPicker = false
-    @Published var watchPickerKind: ProviderKind = .homebrew
+    /// 设置窗口当前 Tab；"软件"Tab 默认定位的来源分段。
+    @Published var settingsTab: SettingsTab = .general
+    @Published var pickerKind: ProviderKind = .homebrew
     /// §16.3 "配置更新来源" Sheet 的目标应用（nil 为关闭）。
     @Published var sourceSheetApp: ManagedApp?
-    /// 首启引导是否已在本次运行中尝试自动弹出。
-    var onboardingAttempted = false
-
     /// 首次启动（从未检查过）时自动打开一次主窗口。
     let openMainWindowOnLaunch: Bool
-    /// 调试：`XUP_DEBUG_OPEN_WINDOW=1` 启动即打开主窗口（不弹首启 Sheet）。
+    /// 调试：`XUP_DEBUG_OPEN_WINDOW=1` 启动即打开主窗口。
     let debugOpenWindow: Bool
+    /// 调试：启动后自动打开设置窗口。
+    var debugOpenSettings = false
     /// 主窗口是否由用户/首启逻辑明确请求打开；未请求而被系统自动恢复的窗口会被关闭。
     var mainWindowRequested = false
 
@@ -62,6 +66,19 @@ final class UIState: ObservableObject {
         // 调试：`XUP_DEBUG_SIDEBAR=<ProviderKind.rawValue>` 指定启动时选中的分区。
         if let raw = env["XUP_DEBUG_SIDEBAR"], let k = ProviderKind(rawValue: raw) {
             sidebar = .kind(k)
+        }
+        // 调试：`XUP_DEBUG_SETTINGS=watch:plugin` 启动后自动打开设置窗口到指定 Tab（watch 可带来源分段）。
+        if let raw = env["XUP_DEBUG_SETTINGS"] {
+            let parts = raw.split(separator: ":").map(String.init)
+            switch parts.first {
+            case "general": settingsTab = .general
+            case "watch": settingsTab = .watch
+            case "agents": settingsTab = .agents
+            case "apps": settingsTab = .apps
+            default: break
+            }
+            if parts.count > 1, let k = ProviderKind(rawValue: parts[1]) { pickerKind = k }
+            debugOpenSettings = true
         }
         NSLog("[Xup] UIState init, openMainWindowOnLaunch=\(openMainWindowOnLaunch) debug=\(debugOpenWindow)")
     }
@@ -80,24 +97,16 @@ final class UIState: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: Self.hasSeenWatchPickerKey) }
     }
 
-    /// `tracked` 全空且从未看过 Sheet → 首启引导。
+    /// `tracked` 全空且从未打开过"软件"Tab → 首启引导（主窗口欢迎态）。
     func needsOnboarding(_ settings: AppSettings) -> Bool {
         settings.tracked.values.allSatisfy(\.isEmpty) && !hasSeenWatchPicker
     }
 
-    /// 打开"选择软件…" Sheet；`kind` 为 nil 或 .app 时默认 Homebrew。
-    func presentWatchPicker(kind: ProviderKind?) {
-        watchPickerKind = (kind == nil || kind == .app) ? .homebrew : kind!
-        showWatchPicker = true
-    }
-
-    /// 等当前检查结束后再检查一次（Sheet "完成"时启动检查可能仍在进行）。
-    func checkAfterCurrent(center: UpdateCenter) {
-        showLog = true
-        Task {
-            while center.isChecking { try? await Task.sleep(for: .milliseconds(200)) }
-            await center.checkAll()
-        }
+    /// 把设置窗口切到"软件"Tab 并定位分段；`kind` 为 nil 或 .app 时默认 Homebrew。
+    /// 真正打开设置窗口需由视图用 `@Environment(\.openSettings)` 完成（先 `XupActions.activate()`）。
+    func selectWatchTab(kind: ProviderKind?) {
+        pickerKind = (kind == nil || kind == .app) ? .homebrew : kind!
+        settingsTab = .watch
     }
 
     // MARK: - 动作
@@ -208,7 +217,7 @@ extension UpdateItem {
 extension ProviderKind {
     /// 侧栏固定顺序（§2.2）：Homebrew · npm 全局 · uv tool · Agents · Skills · 插件 · 应用。
     static let sidebarOrder: [ProviderKind] = [.homebrew, .npm, .uv, .agent, .skill, .plugin, .app]
-    /// "选择软件…" Sheet 的分段（不含应用）。
+    /// 设置 › 软件 的分段（不含应用）。
     static let pickerOrder: [ProviderKind] = [.homebrew, .npm, .uv, .agent, .skill, .plugin]
 
     /// §6.9 / §13 文案中的"本机已安装的 ×× "。
@@ -224,7 +233,7 @@ extension ProviderKind {
         }
     }
 
-    /// Sheet 加载态显示的命令。
+    /// 设置 › 软件 加载态显示的命令。
     var listCommand: String {
         switch self {
         case .homebrew: return "$ brew list --versions"

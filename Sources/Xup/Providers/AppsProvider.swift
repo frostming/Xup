@@ -27,11 +27,14 @@ struct AppsProvider: UpdateProvider {
 
     static func facts(for app: ManagedApp) -> BundleFacts? {
         let url = URL(fileURLWithPath: app.path)
-        guard let b = Bundle(url: url), let info = b.infoDictionary else { return nil }
+        // 不用 Bundle(url:)：NSBundle 会按路径缓存 Info.plist，应用被替换后同一进程内读到的仍是旧版本号。
+        let plistURL = url.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: plistURL),
+              let info = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any] else { return nil }
         let short = info["CFBundleShortVersionString"] as? String ?? info["CFBundleVersion"] as? String ?? "?"
         let feed = (info["SUFeedURL"] as? String).flatMap(URL.init(string:))
         let receipt = FileManager.default.fileExists(atPath: url.appendingPathComponent("Contents/_MASReceipt/receipt").path)
-        return BundleFacts(name: app.name, bundleID: b.bundleIdentifier, shortVersion: short, build: info["CFBundleVersion"] as? String, feedURL: feed, hasMASReceipt: receipt)
+        return BundleFacts(name: app.name, bundleID: info["CFBundleIdentifier"] as? String, shortVersion: short, build: info["CFBundleVersion"] as? String, feedURL: feed, hasMASReceipt: receipt)
     }
 
     /// 应用的"选择"即 managedApps，这里返回它们以便统一展示。
@@ -201,7 +204,7 @@ struct AppsProvider: UpdateProvider {
         let state = QuitState()
         let started = Date()
 
-        /// 查询该应用的存活进程并退出它们。`abortIfNoRestart`：未开启"更新后重启"时抛错（替换前复查用），
+        /// 查询该应用的存活进程并退出它们。`abortIfNoRestart`：策略为"等我关闭后再更新"（restartAfterUpdate = false）时抛错（替换前复查用），
         /// 否则仅跳过退出（brew / mas 分支由命令自行处理）。
         let quitIfRunning: @Sendable (_ stage: String, _ abortIfNoRestart: Bool) async throws -> Void = { stage, abortIfNoRestart in
             let procs = await MainActor.run { Self.runningProcesses(appPath: app.path, bundleID: bundleID) }
@@ -212,13 +215,14 @@ struct AppsProvider: UpdateProvider {
             }
             guard app.restartAfterUpdate else {
                 if abortIfNoRestart {
-                    throw ShellError.failed(name, 1, "应用正在运行，已取消替换（可开启\"更新后重启\"）")
+                    throw ShellError.failed(name, 1, "应用运行中，按设置暂不更新；关闭后再更新，或在\"配置应用…\"里改为自动退出并重新打开")
                 }
-                log("\(stage)：\(name) 正在运行（\(live.count) 个进程），未开启\"更新后重启\"，不主动退出", false)
+                log("\(stage)：\(name) 正在运行（\(live.count) 个进程），按设置\"等我关闭后再更新\"，不主动退出", false)
                 return
             }
             state.markQuit(pids: await MainActor.run { live.map(\.processIdentifier) })
             try await quit(live, name: name, log: log)
+            await Self.killStrayProcesses(inside: app.path, name: name, log: log)
         }
 
         do {
@@ -421,16 +425,49 @@ struct AppsProvider: UpdateProvider {
     }
 
     /// 重新启动应用：最多 3 次、间隔 2 秒；每次启动后等 3 秒确认出现了 pid 存活的新实例。失败只记日志，不抛错。
+    /// 清理可执行文件位于该 .app 内、但不属于 NSRunningApplication 的遗留进程
+    /// （如 Electron 的 chrome_crashpad_handler、应用自带的 CLI 子进程）。它们在主进程退出后
+    /// 被 launchd 过继，LaunchServices 会把它们算作应用的 subordinate 进程而残留旧注册。
+    static func killStrayProcesses(inside appPath: String, name: String, log: @escaping Logger) async {
+        let root = URL(fileURLWithPath: appPath).standardizedFileURL.path + "/"
+        guard let r = try? await Shell.run(["/bin/ps", "-axo", "pid=,comm="], timeout: 15) else { return }
+        var pids: [(pid_t, String)] = []
+        for line in r.stdout.split(separator: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            guard let sp = t.firstIndex(of: " "), let pid = pid_t(t[..<sp]) else { continue }
+            let comm = t[t.index(after: sp)...].trimmingCharacters(in: .whitespaces)
+            if comm.hasPrefix(root), pid != getpid() { pids.append((pid, String(comm))) }
+        }
+        guard !pids.isEmpty else { return }
+        log("清理 \(name) 遗留子进程：" + pids.map { "\($0.0) \(($0.1 as NSString).lastPathComponent)" }.joined(separator: ", "), false)
+        for (pid, _) in pids { kill(pid, SIGTERM) }
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        for (pid, comm) in pids where kill(pid, 0) == 0 {
+            kill(pid, SIGKILL)
+            log("强制结束遗留子进程 \(pid) \((comm as NSString).lastPathComponent)", false)
+        }
+    }
+
     private func relaunch(app: ManagedApp, name: String, bundleID: String?, quitPIDs: Set<pid_t>, log: @escaping Logger) async {
         let url = URL(fileURLWithPath: app.path)
         for attempt in 1...3 {
             log("重新启动 \(name)（第 \(attempt)/3 次）", false)
             do {
-                let cfg = NSWorkspace.OpenConfiguration()
-                cfg.activates = false
-                let ra = try await NSWorkspace.shared.openApplication(at: url, configuration: cfg)
-                let pid = await MainActor.run { ra.processIdentifier }
-                log("openApplication 返回 pid \(pid)，等待 3 秒确认", false)
+                if attempt == 1 {
+                    let cfg = NSWorkspace.OpenConfiguration()
+                    cfg.activates = false
+                    let ra = try await NSWorkspace.shared.openApplication(at: url, configuration: cfg)
+                    let pid = await MainActor.run { ra.processIdentifier }
+                    log("openApplication 返回 pid \(pid)，等待 3 秒确认", false)
+                } else {
+                    // 第 2 次起改走 Finder 的打开路径：应用退出后若 LaunchServices 残留了旧注册
+                    // （其派生子进程被 launchd 过继，LS 视为仍在运行），open/NSWorkspace 启动的新进程
+                    // 会在 100ms 内静默退出，而 Finder 的打开能成功并清掉旧注册。
+                    log("改用 Finder 打开 \(name)（绕过 LaunchServices 残留注册）", false)
+                    let posix = url.path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+                    try await Shell.runChecked(["/usr/bin/osascript", "-e", "tell application \"Finder\" to open POSIX file \"\(posix)\""], timeout: 30)
+                    log("Finder 已发出打开请求，等待 3 秒确认", false)
+                }
                 try await Task.sleep(nanoseconds: 3_000_000_000)
                 let procs = await MainActor.run { Self.runningProcesses(appPath: app.path, bundleID: bundleID) }
                 let live = await MainActor.run { Self.liveProcesses(procs, name: name, log: log) }

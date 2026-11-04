@@ -11,9 +11,12 @@ enum XupActions {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// 仅作兜底；视图内请优先用 `@Environment(\.openSettings)`（macOS 14+），响应链方式在菜单栏面板里不可靠。
     static func openSettings() {
         activate()
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
+            _ = NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        }
     }
 
     /// 打开 NSOpenPanel 选择 .app，多选。
@@ -86,5 +89,52 @@ extension AppUpdateSource {
         case .electronYML(let url): return "electron-updater \(url.absoluteString)"
         case .appcast(let url): return "Sparkle \(url.absoluteString)"
         }
+    }
+}
+
+/// §17 `ManagedApp.restartAfterUpdate` 的界面语义："应用正在运行时怎么办"。
+/// 只是文案层的映射，配置键与字段名不变。
+enum AppRunningPolicy: Hashable, CaseIterable {
+    /// restartAfterUpdate = true：替换前自动退出，替换后自动重新打开。
+    case relaunch
+    /// restartAfterUpdate = false：应用在运行就跳过本次更新，等用户关闭后再更新。
+    case waitForQuit
+
+    init(restartAfterUpdate: Bool) { self = restartAfterUpdate ? .relaunch : .waitForQuit }
+    var restartAfterUpdate: Bool { self == .relaunch }
+
+    /// Picker / 右键菜单选项文字。
+    var title: String {
+        switch self {
+        case .relaunch: return "自动退出并重新打开"
+        case .waitForQuit: return "等我关闭后再更新"
+        }
+    }
+
+    /// 表格 detail 行末尾的小标签。
+    var shortTag: String {
+        switch self {
+        case .relaunch: return "运行中自动重开"
+        case .waitForQuit: return "运行中跳过"
+        }
+    }
+
+    var tooltip: String {
+        switch self {
+        case .relaunch: return "更新时若应用正在运行，Xup 会先下载校验，替换前自动退出它，替换后自动重新打开。"
+        case .waitForQuit: return "更新时若应用正在运行，这次更新会跳过；等你关闭应用后再更新。应用未运行时照常更新。"
+        }
+    }
+
+    /// 设置 › 应用 列表下方的说明。
+    static let explanation = "每个应用可在“配置应用…”里选择正在运行时的处理：“自动退出并重新打开”（运行中自动重开）会在替换前退出、替换后重开；“等我关闭后再更新”（运行中跳过）则在应用运行时跳过本次更新，等你关闭后再更新。"
+
+    /// 策略为"等我关闭后再更新"且应用正在运行、又有新版本时，状态列的提示。
+    static let skippedWhileRunningHint = "应用运行中，按设置暂不更新；关闭后点“更新”，或在“配置应用…”里改为自动退出并重新打开"
+
+    /// 轻量判断：该 .app 是否有正在运行的进程（按 bundleURL 路径比对）。
+    static func isRunning(appPath: String) -> Bool {
+        let target = URL(fileURLWithPath: appPath).standardizedFileURL.path
+        return NSWorkspace.shared.runningApplications.contains { $0.bundleURL?.standardizedFileURL.path == target }
     }
 }
