@@ -27,9 +27,11 @@ enum SettingsTab: Hashable {
     case general, agents
 }
 
-/// §21 来源分区的内容模式："已关注"为更新表格，"已安装"为本机已安装清单（勾选即关注）。
-enum SectionMode: Hashable {
-    case watched, installed
+/// §21 "添加要跟踪的软件" Sheet 的请求：目标来源 + 是否显示来源 Picker（"全部"分区打开时为 true）。
+struct AddWatchRequest: Identifiable, Equatable {
+    var kind: ProviderKind
+    var showsPicker: Bool
+    var id: String { "\(kind.rawValue):\(showsPicker)" }
 }
 
 /// 一轮由界面发起的更新。
@@ -57,12 +59,14 @@ final class UIState: ObservableObject {
     @Published var completion: (text: String, failed: Bool)?
     /// 设置窗口当前 Tab。
     @Published var settingsTab: SettingsTab = .general
-    /// §21 各来源分区的内容模式（缺省为"已关注"）；"全部"与"应用"分区没有"已安装"模式。
-    @Published var sectionModes: [ProviderKind: SectionMode] = [:]
-    /// "已安装"模式里改过关注列表、尚未检查的来源；切回"已关注"时触发一次 `checkAll()`。
+    /// §21 "添加要跟踪的软件" Sheet（nil 为关闭）。
+    @Published var addWatch: AddWatchRequest?
+    /// Sheet 里改过关注列表、尚未检查的来源；Sheet 关闭（"完成"）时触发一次 `checkAll()`。
     @Published var pendingRecheckKinds: Set<ProviderKind> = []
-    /// "已安装"清单缓存（按来源），避免切换模式时反复执行 `brew list` 等；"重新读取"会清掉。
+    /// 已安装清单缓存（按来源），Sheet 内切换来源 / 重新打开不反复执行 `brew list` 等；检查 / 更新结束与"重新读取"会清掉。
     var installedCache: [ProviderKind: [InstalledEntry]] = [:]
+    /// 调试：主窗口出现后自动弹出的添加 Sheet。
+    var debugAddWatch: AddWatchRequest?
     /// §16.3 "配置更新来源" Sheet 的目标应用（nil 为关闭）。
     @Published var sourceSheetApp: ManagedApp?
     /// §18 更新历史：筛选"仅失败"；工具栏"清空历史"请求（由 HistoryView 弹二次确认）。
@@ -82,7 +86,7 @@ final class UIState: ObservableObject {
         let env = ProcessInfo.processInfo.environment
         var debugWindow = env["XUP_DEBUG_OPEN_WINDOW"] == "1"
         var initialSidebar: SidebarItem? = .all
-        var initialModes: [ProviderKind: SectionMode] = [:]
+        var initialAddWatch: AddWatchRequest?
         var initialTab: SettingsTab = .general
         var openSettings = false
         // 调试：`XUP_DEBUG_SIDEBAR=<ProviderKind.rawValue>` 指定启动时选中的分区。
@@ -90,16 +94,21 @@ final class UIState: ObservableObject {
             if raw == "history" { initialSidebar = .history } else if let k = ProviderKind(rawValue: raw) { initialSidebar = .kind(k) }
         }
         // 调试：`XUP_DEBUG_SETTINGS=general|agents` 启动后自动打开设置窗口到指定 Tab；
-        // `XUP_DEBUG_SETTINGS=watch[:plugin]` / `apps` 则打开主窗口并切到对应来源的"已安装"模式 / 应用分区（§21）。
+        // `XUP_DEBUG_SETTINGS=watch[:plugin]` 打开主窗口并弹出对应来源的添加 Sheet（不带来源时为"全部"分区的带 Picker 形态）；
+        // `apps` 打开主窗口的应用分区（§21）。
         if let raw = env["XUP_DEBUG_SETTINGS"] {
             let parts = raw.split(separator: ":").map(String.init)
             switch parts.first {
             case "general": initialTab = .general; openSettings = true
             case "agents": initialTab = .agents; openSettings = true
             case "watch":
-                let k = (parts.count > 1 ? ProviderKind(rawValue: parts[1]) : nil).flatMap { $0 == .app ? nil : $0 } ?? .homebrew
-                initialSidebar = .kind(k)
-                initialModes[k] = .installed
+                if let k = (parts.count > 1 ? ProviderKind(rawValue: parts[1]) : nil), k != .app {
+                    initialSidebar = .kind(k)
+                    initialAddWatch = AddWatchRequest(kind: k, showsPicker: false)
+                } else {
+                    initialSidebar = .all
+                    initialAddWatch = AddWatchRequest(kind: .homebrew, showsPicker: true)
+                }
                 debugWindow = true
             case "apps":
                 initialSidebar = .kind(.app)
@@ -112,7 +121,7 @@ final class UIState: ObservableObject {
             || d.object(forKey: "lastCheckedAt") == nil
             || (!d.bool(forKey: Self.hasSeenWatchPickerKey) && ConfigStore.quickTrackedIsEmpty())
         sidebar = initialSidebar
-        sectionModes = initialModes
+        debugAddWatch = initialAddWatch
         settingsTab = initialTab
         debugOpenSettings = openSettings
         NSLog("[Xup] UIState init, openMainWindowOnLaunch=\(openMainWindowOnLaunch) debug=\(debugOpenWindow)")
@@ -132,41 +141,27 @@ final class UIState: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: Self.hasSeenWatchPickerKey) }
     }
 
-    /// `tracked` 全空且从未打开过"已安装"清单 → 首启引导（主窗口欢迎态）。
+    /// `tracked` 全空且从未打开过添加 Sheet → 首启引导（主窗口欢迎态）。
     func needsOnboarding(_ settings: AppSettings) -> Bool {
         settings.tracked.values.allSatisfy(\.isEmpty) && !hasSeenWatchPicker
     }
 
-    // MARK: - §21 分区模式
+    // MARK: - §21 添加要跟踪的软件
 
-    func mode(for kind: ProviderKind) -> SectionMode {
-        kind == .app ? .watched : (sectionModes[kind] ?? .watched)
+    /// 弹出添加 Sheet：来源分区 → 该来源；`kind` 为 nil（"全部"）→ Homebrew 且带来源 Picker；`.app` 不用此 Sheet（走 NSOpenPanel）。
+    func presentAddWatch(kind: ProviderKind?) {
+        guard let kind, kind != .app else {
+            addWatch = AddWatchRequest(kind: .homebrew, showsPicker: true)
+            return
+        }
+        addWatch = AddWatchRequest(kind: kind, showsPicker: false)
     }
 
-    /// 切换某来源分区的模式；从"已安装"切回"已关注"且期间改过关注列表时检查一次。
-    func setMode(_ mode: SectionMode, for kind: ProviderKind, center: UpdateCenter? = nil) {
-        guard kind != .app else { return }
-        let old = self.mode(for: kind)
-        sectionModes[kind] = mode
-        selection = []
-        search = ""
-        if old == .installed, mode == .watched, let center { recheckIfNeeded(center: center) }
-    }
-
-    /// `pendingRecheckKinds` 非空时触发一次全量检查（沿用 `check` 的去重：检查中则不重复）。
+    /// Sheet 关闭后：`pendingRecheckKinds` 非空时触发一次全量检查（沿用 `check` 的去重：检查中则不重复）。
     func recheckIfNeeded(center: UpdateCenter) {
         guard !pendingRecheckKinds.isEmpty else { return }
         pendingRecheckKinds = []
         check(center: center)
-    }
-
-    /// 切到某来源的"已安装"模式；`kind` 为 nil 或 .app 时默认 Homebrew。调用方负责打开 / 激活主窗口。
-    func showInstalled(kind: ProviderKind?) {
-        let k = (kind == nil || kind == .app) ? .homebrew : kind!
-        sidebar = .kind(k)
-        sectionModes[k] = .installed
-        selection = []
-        search = ""
     }
 
     // MARK: - 动作
@@ -296,7 +291,7 @@ extension UpdateItem {
 extension ProviderKind {
     /// 侧栏固定顺序（§2.2）：Homebrew · npm 全局 · uv tool · Agents · Skills · 插件 · 应用。
     static let sidebarOrder: [ProviderKind] = [.homebrew, .npm, .uv, .agent, .skill, .plugin, .app]
-    /// 有"已安装"模式的来源（不含应用）。
+    /// 添加 Sheet 来源 Picker 的分段（不含应用）。
     static let pickerOrder: [ProviderKind] = [.homebrew, .npm, .uv, .agent, .skill, .plugin]
 
     /// §6.9 / §13 文案中的"本机已安装的 ×× "。
@@ -312,7 +307,7 @@ extension ProviderKind {
         }
     }
 
-    /// "已安装"清单加载态显示的命令。
+    /// 添加 Sheet 加载态显示的命令。
     var listCommand: String {
         switch self {
         case .homebrew: return "$ brew list --versions"

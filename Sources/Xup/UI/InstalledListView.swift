@@ -1,11 +1,107 @@
 import SwiftUI
 
-/// §21 某来源的"已安装"清单（原 §13.7 `WatchListPane` 的单来源形态）：本机已安装条目 + 勾选即关注（300ms 去抖写入）
-/// + 底部 全选 / 清空 / `已关注 N 项 · 共 M 项` / 立即检查。四态（加载中 / 为空 / 读取失败 / 不可用）不变。
-/// 搜索：传入 `query` 则由外部（主窗口工具栏搜索框）驱动，否则显示自带搜索框。
+/// §21 "添加要跟踪的 <来源>" Sheet（560×480）：头部 标题 / 说明 / （"全部"分区打开时）来源 Picker + 搜索框；
+/// 主体为 `InstalledListView`（本机已安装清单，勾选即关注）；底部 全选 / 清空 / 计数 / 完成。
+/// "完成"或关闭 Sheet 后，若期间改过关注列表（`ui.pendingRecheckKinds`）则检查一次。
+struct AddWatchSheet: View {
+    let request: AddWatchRequest
+
+    @EnvironmentObject private var center: UpdateCenter
+    @EnvironmentObject private var ui: UIState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var kind: ProviderKind = .homebrew
+    @State private var query = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            InstalledListView(kind: kind, query: $query) { dismiss() }
+                .id(kind)
+        }
+        .frame(width: 560, height: 480)
+        .onAppear { kind = request.kind }
+        .onChange(of: kind) { _, _ in query = "" }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(request.showsPicker ? "添加要跟踪的软件" : "添加要跟踪的 \(request.kind.title)").font(.headline)
+                Text("从本机已安装的\(kind.installedNoun)中勾选，勾选即时生效；点“完成”后 Xup 会检查一次新关注的条目。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            if request.showsPicker {
+                // "全部"分区：六个来源的分段 Picker；放不下时搜索框换行。
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        sourcePicker
+                        Spacer(minLength: 0)
+                        searchField
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        sourcePicker
+                        searchField
+                    }
+                }
+            } else {
+                searchField.frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+
+    private func isUnavailable(_ k: ProviderKind) -> Bool { center.unavailable.contains(k) }
+
+    private var sourcePicker: some View {
+        Picker("来源", selection: $kind) {
+            ForEach(ProviderKind.pickerOrder) { k in
+                Text(k.title)
+                    .foregroundStyle(isUnavailable(k) ? .tertiary : .primary)
+                    .help(isUnavailable(k) ? "未检测到 \(k.title)" : k.title)
+                    .tag(k)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .fixedSize()
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).imageScale(.small)
+            TextField("搜索", text: $query)
+                .textFieldStyle(.plain)
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).imageScale(.small)
+                }
+                .buttonStyle(.plain)
+                .help("清除")
+            }
+        }
+        .padding(.horizontal, 6)
+        .frame(height: 22)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
+        .frame(minWidth: 160, maxWidth: 240)
+    }
+}
+
+/// 某来源的本机已安装清单（原 §13.7 `WatchListPane` 的单来源形态）：勾选即关注（300ms 去抖写入），
+/// 底部 全选 / 清空 / `已关注 N 项 · 共 M 项` / 完成。四态（加载中 / 为空 / 读取失败 / 不可用）不变。
+/// 搜索文本由外部（`AddWatchSheet` 的搜索框）通过 `query` 传入。
 struct InstalledListView: View {
     let kind: ProviderKind
-    var query: Binding<String>? = nil
+    @Binding var query: String
+    /// "完成"按钮：由调用方关闭 Sheet；本视图先落盘未提交的勾选。
+    let onDone: () -> Void
 
     @EnvironmentObject private var center: UpdateCenter
     @EnvironmentObject private var settings: AppSettings
@@ -18,7 +114,6 @@ struct InstalledListView: View {
         case unavailable
     }
 
-    @State private var localQuery = ""
     @State private var selected: Set<String> = []
     @State private var state: LoadState = .loading
     @State private var loadTask: Task<Void, Never>?
@@ -27,22 +122,20 @@ struct InstalledListView: View {
 
     // MARK: 派生
 
-    private var queryText: String { query?.wrappedValue ?? localQuery }
-
     private var entries: [InstalledEntry] {
         if case .loaded(let list) = state { return list }
         return []
     }
 
     private var filtered: [InstalledEntry] {
-        let q = queryText.trimmingCharacters(in: .whitespaces)
+        let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return entries }
         return entries.filter {
             $0.name.localizedCaseInsensitiveContains(q) || ($0.detail?.localizedCaseInsensitiveContains(q) ?? false)
         }
     }
 
-    private var isSearching: Bool { !queryText.trimmingCharacters(in: .whitespaces).isEmpty }
+    private var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
     private var isLoaded: Bool { if case .loaded = state { return true } else { return false } }
 
     private var countText: String {
@@ -58,8 +151,6 @@ struct InstalledListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            Divider()
             listArea.frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
             footer
@@ -79,50 +170,6 @@ struct InstalledListView: View {
             // 还没落盘的去抖写入立即提交。
             flush()
         }
-    }
-
-    private var header: some View {
-        // 自带搜索框时与说明同一行；放不下就换行。
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                caption
-                Spacer(minLength: 0)
-                if query == nil { searchField }
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                caption
-                if query == nil { searchField }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    private var caption: some View {
-        Text("勾选要让 Xup 跟踪的\(kind.installedNoun)，勾选即时生效；切回“已关注”后会自动检查一次。")
-            .font(.caption).foregroundStyle(.secondary)
-            .lineLimit(2)
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).imageScale(.small)
-            TextField("搜索", text: $localQuery)
-                .textFieldStyle(.plain)
-            if !localQuery.isEmpty {
-                Button { localQuery = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).imageScale(.small)
-                }
-                .buttonStyle(.plain)
-                .help("清除")
-            }
-        }
-        .padding(.horizontal, 6)
-        .frame(height: 22)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
-        .frame(minWidth: 160, maxWidth: 240)
     }
 
     @ViewBuilder private var listArea: some View {
@@ -146,8 +193,8 @@ struct InstalledListView: View {
                 smallEmpty(symbol: kind.symbol, title: "没有找到已安装的 \(kind.installedNoun)",
                            description: "安装后点击“重新读取”。", button: "重新读取", help: nil) { reload() }
             } else if filtered.isEmpty {
-                smallEmpty(symbol: "magnifyingglass", title: "没有匹配“\(queryText)”的条目",
-                           description: nil, button: "清除搜索", help: nil) { clearQuery() }
+                smallEmpty(symbol: "magnifyingglass", title: "没有匹配“\(query)”的条目",
+                           description: nil, button: "清除搜索", help: nil) { query = "" }
             } else {
                 List(filtered) { entry in
                     row(entry)
@@ -227,27 +274,18 @@ struct InstalledListView: View {
                 .disabled(filtered.isEmpty)
             Text(countText).font(.caption).foregroundStyle(.secondary)
             Spacer()
-            if center.isChecking {
-                ProgressView().controlSize(.small)
-                Text("正在检查…").font(.caption).foregroundStyle(.secondary)
-            }
-            Button("立即检查") { checkNow() }
+            Button("完成") { flush(); onDone() }
                 .buttonStyle(.borderedProminent)
-                .disabled(center.isChecking || settings.tracked.values.allSatisfy(\.isEmpty))
-                .help("按当前关注列表检查一次更新")
+                .keyboardShortcut(.defaultAction)
+                .help(ui.pendingRecheckKinds.isEmpty ? "关闭" : "关闭并检查一次新关注的条目")
         }
         .controlSize(.regular)
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)
         .frame(height: 48)
-        .background(.bar)
     }
 
     // MARK: 逻辑
-
-    private func clearQuery() {
-        if let query { query.wrappedValue = "" } else { localQuery = "" }
-    }
 
     private func set(_ name: String, _ on: Bool) {
         if on { selected.insert(name) } else { selected.remove(name) }
@@ -271,7 +309,7 @@ struct InstalledListView: View {
         }
     }
 
-    /// 落盘；有实际变化时记入 `ui.pendingRecheckKinds`，切回"已关注"时检查一次。
+    /// 落盘；有实际变化时记入 `ui.pendingRecheckKinds`，Sheet 关闭时检查一次。
     private func flush() {
         commitTask?.cancel()
         commitTask = nil
@@ -279,12 +317,6 @@ struct InstalledListView: View {
             settings.setTracked(kind, names: selected)
             ui.pendingRecheckKinds.insert(kind)
         }
-    }
-
-    private func checkNow() {
-        flush()
-        ui.pendingRecheckKinds = []
-        ui.check(center: center)
     }
 
     private func load() {

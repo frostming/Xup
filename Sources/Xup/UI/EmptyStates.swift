@@ -10,9 +10,9 @@ enum EmptyStates {
             ContentUnavailableView {
                 Label("先选择要跟踪的软件", systemImage: "arrow.up.circle")
             } description: {
-                Text("Xup 只会检查和更新你勾选的条目。在各来源分区的“已安装”中勾选，勾选即时生效。")
+                Text("Xup 只会检查和更新你勾选的条目。点工具栏的“+”，从本机已安装的软件中勾选，勾选即时生效。")
             } actions: {
-                Button(action: pick) { Label("选择软件…", systemImage: "checklist") }
+                Button(action: pick) { Label("添加软件…", systemImage: "plus") }
                     .buttonStyle(.borderedProminent)
                 Button("添加应用…", action: addApps).buttonStyle(.link)
             }
@@ -42,9 +42,9 @@ enum EmptyStates {
             ContentUnavailableView {
                 Label("还没有选择要跟踪的软件", systemImage: kind.symbol)
             } description: {
-                Text("切到“已安装”，从本机已安装的 \(kind.installedNoun) 中勾选要让 Xup 检查更新的条目。")
+                Text("从本机已安装的 \(kind.installedNoun) 中勾选要让 Xup 检查更新的条目。")
             } actions: {
-                Button(action: pick) { Label("查看已安装…", systemImage: "checklist") }
+                Button(action: pick) { Label("添加 \(kind.title)…", systemImage: "plus") }
                     .buttonStyle(.borderedProminent)
             }
         }
@@ -165,7 +165,7 @@ enum EmptyStates {
             } actions: {
                 Button("清除搜索", action: clear).buttonStyle(.bordered)
                 if let pick {
-                    Button("在“已安装”中查找已安装但未跟踪的条目", action: pick).buttonStyle(.link)
+                    Button("在“添加…”中查找已安装但未跟踪的条目", action: pick).buttonStyle(.link)
                 }
             }
         }

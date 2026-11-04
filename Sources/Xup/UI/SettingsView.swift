@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// §7 / §21 设置窗口：只剩 通用 / Agents 两个 Tab，统一 620×520；"软件"与"应用"的管理在主窗口里（各来源分区的"已安装"模式、应用分区）。
+/// §7 / §21 设置窗口：只剩 通用 / Agents 两个 Tab，统一 620×520；"软件"与"应用"的管理在主窗口里（工具栏"+"弹出的添加 Sheet、应用分区）。
 /// Tab 选择由 `UIState.settingsTab` 驱动，便于主窗口 / 菜单栏入口直接定位到某个 Tab。
 struct SettingsView: View {
     @EnvironmentObject private var ui: UIState
@@ -183,14 +183,15 @@ struct GeneralSettings: View {
                     HStack(spacing: 8) {
                         Text("\(trackedCount) 项").foregroundStyle(.secondary)
                         Button("管理…") {
-                            // §21：打开主窗口并切到 Homebrew 分区的"已安装"模式。
-                            ui.showInstalled(kind: .homebrew)
+                            // §21：打开主窗口（Homebrew 分区）并弹出添加 Sheet；窗口可能刚创建，稍等再 present。
+                            ui.sidebar = .kind(.homebrew)
                             ui.mainWindowRequested = true
                             openWindow(id: XupActions.mainWindowID)
                             XupActions.activate()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { ui.presentAddWatch(kind: .homebrew) }
                         }
                         .controlSize(.small)
-                        .help("在主窗口各来源分区的“已安装”中勾选要跟踪的软件；应用在“应用”分区添加")
+                        .help("在主窗口用工具栏“+”从本机已安装的软件中勾选要跟踪的条目；应用在“应用”分区添加")
                     }
                 }
                 LabeledContent("版本", value: XupFormat.appVersion)

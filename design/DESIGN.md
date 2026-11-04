@@ -98,7 +98,7 @@ Xup (MenuBarExtra, .window 样式)
 | 更新选中 | `arrow.down.circle` | 选中集合中 `isActionable` 数量为 0 时禁用；标题动态为"更新选中 (3)"；`⌘U` |
 | 全部更新 | `arrow.down.to.line` | 当前分区无可更新项时禁用；`⇧⌘U`；点击前若 > 5 项弹确认 Alert |
 | 添加应用… | `plus` | **仅在"应用"分区显示**；打开 NSOpenPanel（`/Applications`，仅 `.app`，多选）；`⌘N` |
-| 选择软件… | `checklist` | ~~在"全部"与除"应用"外的所有来源分区显示，打开 §13 的 Sheet~~ → **§21**：只在"全部"分区显示，点击切到 Homebrew 分区的"已安装"模式；来源分区由居中的"已关注 \| 已安装"分段承担，`⇧⌘N` 在来源分区直接切到"已安装"。更新进行中禁用 |
+| 添加 <来源>… | `plus` | ~~"选择软件…" `checklist`，打开 §13 的 Sheet~~ → **§21**：在"全部"与除"应用"外的所有来源分区显示，与"添加应用…"互斥占同一位置；tooltip "添加 Homebrew…"（"全部"为"添加软件…"）；弹出 §21.2 的 `AddWatchSheet`（"全部"时带来源 Picker）；`⇧⌘N`。更新进行中禁用 |
 | 搜索 | `.searchable(text:placement: .toolbar)` | 过滤 name / detail |
 | 日志 | `terminal` | `Toggle` 样式按钮，控制日志面板显隐；`⌥⌘L` |
 
@@ -443,7 +443,7 @@ Xup (MenuBarExtra, .window 样式)
 
 ### 13.7 Sheet 并入设置窗口（2026-11-04 变更）
 
-> **已被 §21 取代（2026-11-04）**：设置窗口不再有"软件"Tab，`WatchListPane` 重构为单来源的 `InstalledListView(kind:)`，嵌在主窗口各来源分区的"已安装"模式里。以下保留为历史记录；其中"勾选即时生效 / 300ms 去抖 / 四态 / 策略小标签"等规格仍然有效，只是落点变了。
+> **已被 §21 取代（2026-11-04）**：设置窗口不再有"软件"Tab，`WatchListPane` 重构为单来源的 `InstalledListView(kind:)`，作为主窗口工具栏"+"弹出的 `AddWatchSheet` 的主体。以下保留为历史记录；其中"勾选即时生效 / 300ms 去抖 / 四态 / 策略小标签"等规格仍然有效，只是落点变了。
 
 - "选择软件…"不再是主窗口的 Sheet，而是**设置窗口的"软件"Tab**（symbol `checklist`，位于"通用"之后、"Agents"之前；视图 `WatchListPane`，文件 `WatchListPane.swift`）。内容即原 §13.2 主体：来源分段控件 + 搜索框 + 已安装清单（checkbox · 名称 · detail · 版本）+ 底部 全选 / 清空 / `已关注 N 项 · 共 M 项`；每段独立加载并缓存，四态（加载中 / 为空 / 读取失败 / 不可用）不变。设置窗口四个 Tab 统一 **620 × 520**（`SettingsView.tabSize`，各 Tab 根视图 `.frame(width:height:)`，避免 TabView 按内容宽度居中后溢出裁切）；该 Tab 根布局 `.frame(maxWidth: .infinity, maxHeight: .infinity)`，头部 `.padding(.horizontal, 20)`，分段控件 `.fixedSize()` 与搜索框（`minWidth 160, maxWidth 240`）同一行、放不下时用 `ViewThatFits` 换行；列表行左右内边距 16，底部工具条与列表同宽。
 - **勾选即时生效**：切换 checkbox / 全选 / 清空 后 300ms 去抖写入 `settings.setTracked(kind, names:)`；没有"取消 / 完成"按钮。底部右侧 **`立即检查`**（`.borderedProminent`）调用 `center.checkAll()`，检查中禁用并在左侧显示进度与"正在检查…"。外部改动（右键"取消关注"、CLI）会同步回勾选。
@@ -849,40 +849,40 @@ Section「检查」内，原"发现更新时自动更新"位置：
 
 ---
 
-## 21. 主页面全量显示 + 每来源"已关注 / 已安装"分段 + 设置精简（2026-11-04 IA 变更）
+## 21. 主页面全量显示 + 工具栏"+"添加 Sheet + 设置精简（2026-11-04 IA 变更）
 
-> 用户拍板：主页面要能看到**所有关注的软件及其当前版本**，而不只是可更新项；"软件"与"应用"的管理从设置窗口搬回主界面。取代 §13.7，修订 §2.3 / §2.4 / §2.5 / §6 / §7 的相关条目。
+> 用户拍板：主页面要能看到**所有关注的软件及其当前版本**，而不只是可更新项；"软件"与"应用"的管理从设置窗口搬回主界面，且来源分区的交互与"应用"分区一致——工具栏"+"添加、右键"取消关注"/⌫ 移除，**不**做"已关注 | 已安装"分段。取代 §13.7，修订 §2.3 / §2.4 / §2.5 / §6 / §7 的相关条目。
 
 ### 21.1 主页面显示全部关注条目
 
 - `ui.showUpToDate` **默认改为 `true`**（`ConfigStore` 默认值、内嵌 schema 与 `Support/config.schema.json`、CLI `defaultConfig()` 同步）。已有 config.json 里显式写的 `false` 不被覆盖（解码缺省才取 true）。
-- 工具栏新增分段筛选 **`全部 | 仅可更新`**（`Picker` `.segmented`，直接绑定 `settings.showUpToDate`），位于 `primaryAction` 组末尾、紧挨搜索框左侧；"已安装"模式下隐藏。设置 › 通用 的"显示已是最新的条目"开关保留，与该分段联动。
+- 工具栏新增分段筛选 **`全部 | 仅可更新`**（`Picker` `.segmented`，直接绑定 `settings.showUpToDate`），位于 `primaryAction` 组末尾、紧挨搜索框左侧。设置 › 通用 的"显示已是最新的条目"开关保留，与该分段联动。
 - 列表排序（`UpdateCenter.items(for:)`）：**待安装 → 可更新 → 其他状态（失败 / 未知 / 更新中 / 已更新）→ 最新**，同组按名称。表头手动排序规则不变（§2.4）。
 - "最新"行的"最新"列显示当前版本（`latest ?? installed`，`.secondary`），与"已安装"列同值；各 Provider 对关注但未过期的条目返回 `.upToDate`（Homebrew 已如此）。
 - 状态栏左侧文案固定顺序：**`共 N 项 · M 个可更新 · K 个待安装[ · F 个失败]`**，为 0 的段省略。
 
-### 21.2 来源分区的"已关注 | 已安装"分段
+### 21.2 工具栏"+"与"添加要跟踪的 <来源>" Sheet（`AddWatchSheet`）
 
-- 每个来源分区（Homebrew / npm 全局 / uv tool / Agents / Skills / 插件）工具栏新增 `Picker` `.segmented` **`已关注 | 已安装`**（`ToolbarItem(placement: .principal)`；状态存 `UIState.sectionModes: [ProviderKind: SectionMode]`，缺省 `.watched`，不持久化）。"全部"与"应用"分区没有该分段。
-  - **已关注**：现有表格（§2.4）+ 状态栏。
-  - **已安装**：嵌入 `InstalledListView(kind:query:)`（原 `WatchListPane` 的单来源形态，文件 `InstalledListView.swift`）：顶部一行说明 `.caption .secondary`"勾选要让 Xup 跟踪的 {installedNoun}，勾选即时生效；切回'已关注'后会自动检查一次。"；中部已安装清单（checkbox · 名称 · detail · 已关注行的策略小标签 · 版本，行高 36，交替背景；加载中 / 为空 / 读取失败 / 不可用 四态同 §13.4）；底部 48pt `.bar` 工具条：`全选` `清空` · `已关注 N 项 · 共 M 项（显示 K 项）` · 右侧 `立即检查`（`.borderedProminent`，检查中禁用并显示进度）。**搜索复用工具栏搜索框**（`query: $ui.search`，占位"搜索已安装的 {installedNoun}"），视图不再自带搜索框（独立使用时不传 `query` 才显示自带的）。该模式下不显示状态栏；"更新选中 / 全部更新 / 筛选"隐藏，"检查更新 / 日志"保留。副标题 `Homebrew · 已安装`。
-- **勾选即时生效**：300ms 去抖写 `settings.setTracked`；有实际变化时把该来源记入 `ui.pendingRecheckKinds`。**切回"已关注"或切到其他分区时**若集合非空 → 清空并调用一次 `ui.check(center:)`（沿用"检查中则不重复"的保护）；点"立即检查"同样清空集合，避免重复检查。
-- 已安装清单按来源缓存在 `ui.installedCache`，切换模式不重复执行 `brew list`；每次检查 / 更新结束、或点"重新读取"时清缓存。
-- 入口统一改为切到对应来源的"已安装"模式（`UIState.showInstalled(kind:)`，nil / 应用 → Homebrew）：
-  - 工具栏"选择软件…"（`checklist`，`⇧⌘N`）只在"全部"分区显示；来源分区 `⇧⌘N` 直接切"已安装"。
-  - §6.9 空状态按钮改为 **"查看已安装…"**，描述"切到'已安装'，从本机已安装的 … 中勾选…"。
-  - §6.1 欢迎态：描述"在各来源分区的'已安装'中勾选，勾选即时生效。"，主按钮 **"选择软件…"** → Homebrew 的"已安装"；次级链接"添加应用…"不变。
-  - §6.6 搜索无结果的链接文案"在'已安装'中查找已安装但未跟踪的条目"。
-  - 设置 › 通用："跟踪的软件 N 项 · `管理…`"按钮 → 打开主窗口（`openWindow(id:)` + `activate`）并切到 Homebrew 的"已安装"。
-- 调试：`XUP_DEBUG_SETTINGS=watch[:<kind>]` 改为打开主窗口并切到该来源的"已安装"模式；`XUP_DEBUG_SETTINGS=apps` 打开主窗口的"应用"分区；`general` / `agents` 仍打开设置窗口。
+- 来源分区（Homebrew / npm 全局 / uv tool / Agents / Skills / 插件）与"全部"分区的工具栏有 **`+`**（`plus`，`⇧⌘N`，tooltip "添加 Homebrew…" / "添加软件…"）；"应用"分区的 `+` 仍是 NSOpenPanel（`⌘N`）。表格始终显示已关注条目，**没有**模式切换。
+- 点击弹出 `.sheet(item: $ui.addWatch)`（`UIState.addWatch: AddWatchRequest?`，`AddWatchRequest { kind, showsPicker }`），固定 **560 × 480**，结构：
+  - 头部（`.padding(.horizontal, 20)`）：标题 `.headline` **"添加要跟踪的 Homebrew"**（"全部"分区打开时为"添加要跟踪的软件"）；说明 `.caption .secondary`"从本机已安装的 {installedNoun} 中勾选，勾选即时生效；点'完成'后 Xup 会检查一次新关注的条目。"；**"全部"分区打开时多一行来源 Picker**（`.segmented` 六段纯文字，不可用来源 `.tertiary` + tooltip "未检测到 …"），搜索框（自带，`minWidth 160, maxWidth 240`）与 Picker 同行、放不下用 `ViewThatFits` 换行；来源分区打开时只有右对齐的搜索框。切换来源清空搜索。
+  - 主体：`InstalledListView(kind:query:onDone:)`（原 §13.7 `WatchListPane` 的单来源形态，文件 `InstalledListView.swift`）：本机已安装清单（checkbox · 名称 · detail · 已关注行的策略小标签 §19.6 · 版本，行高 36，交替背景）；加载中 / 为空 / 读取失败 / 不可用 四态同 §13.4。
+  - 底部 48pt：`全选` `清空`（只作用于当前过滤结果）· `已关注 N 项 · 共 M 项（显示 K 项）` · 右侧 **`完成`**（`.borderedProminent`，Return）。没有"取消"——勾选已即时生效。
+- **勾选即时生效**：300ms 去抖写 `settings.setTracked`；有实际变化时把该来源记入 `ui.pendingRecheckKinds`。**"完成"或任何方式关闭 Sheet（`onDismiss`）** 时若集合非空 → 清空并调用一次 `ui.check(center:)`（沿用"检查中则不重复"的保护）。
+- 已安装清单按来源缓存在 `ui.installedCache`，同一 Sheet 内切换来源 / 重新打开不反复执行 `brew list`；每次检查 / 更新结束、或点"重新读取"时清缓存。
+- 入口统一改为弹出该 Sheet（`UIState.presentAddWatch(kind:)`，nil → Homebrew + 来源 Picker；`.app` 不走此 Sheet）：
+  - §6.9 空状态按钮 **"添加 <来源>…"**（`plus`，`.borderedProminent`）。
+  - §6.1 欢迎态：描述"点工具栏的'+'，从本机已安装的软件中勾选，勾选即时生效。"，主按钮 **"添加软件…"**（`plus`）→ 带来源 Picker 的 Sheet；次级链接"添加应用…"不变。
+  - §6.6 搜索无结果的链接文案"在'添加…'中查找已安装但未跟踪的条目"。
+  - 设置 › 通用："跟踪的软件 N 项 · `管理…`" → 打开主窗口（`openWindow(id:)` + `activate`，侧栏切到 Homebrew）并延迟 0.3s 弹出 Homebrew 的 Sheet。
+- 调试：`XUP_DEBUG_SETTINGS=watch:<kind>` 打开主窗口到该来源并弹其 Sheet；`watch`（不带来源）打开"全部"分区并弹带 Picker 的 Sheet；`apps` 打开"应用"分区；`general` / `agents` 仍打开设置窗口。
 
-### 21.3 "应用"分区
+### 21.3 移除与"应用"分区
 
-- 工具栏：`添加应用…`（`plus`，`⌘N`）保留，新增 **`移除`**（`minus.circle`，选中行含应用条目时可用；`⌫` 等价）。右键"配置应用…"/"移除"不变。
+- 移除统一走 **右键"取消关注"（`eye.slash`）/ 选中后 ⌫**（§13.1 已有）；工具栏**不加**"移除"按钮。"应用"分区同理：`添加应用…`（`plus`，`⌘N`）+ 右键"配置应用…"/"移除"+ ⌫，不加 `−`。
 - 原 §7.3 设置 › 应用 列表（`AppsSettings`）删除；来源标签 §16.5 的样式继续用于"配置应用…"Sheet 头部。
 
 ### 21.4 设置窗口
 
 - 只保留 **通用 / Agents**（`SettingsTab = general | agents`），尺寸仍 620×520。`UIState.pickerKind` / `selectWatchTab` 删除。
 - 菜单栏面板与 CLI 不变。
-

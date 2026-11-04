@@ -20,6 +20,10 @@ struct MainWindow: View {
         .sheet(item: $ui.sourceSheetApp) { app in
             AppSourceSheet(app: app)
         }
+        // §21 "添加要跟踪的 <来源>" Sheet；关闭后若改过关注列表则检查一次。
+        .sheet(item: $ui.addWatch, onDismiss: { ui.recheckIfNeeded(center: model.center) }) { req in
+            AddWatchSheet(request: req)
+        }
         .onAppear {
             if ui.debugOpenSettings {
                 ui.debugOpenSettings = false
@@ -38,7 +42,11 @@ struct MainWindow: View {
             }
             ui.mainWindowRequested = true
             if ui.openMainWindowOnLaunch { XupActions.activate() }
-            // §21 首启引导：欢迎态主按钮把 Homebrew 分区切到"已安装"模式。
+            // §21 调试：`XUP_DEBUG_SETTINGS=watch[:kind]` 主窗口出现后弹出添加 Sheet。
+            if let req = ui.debugAddWatch {
+                ui.debugAddWatch = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { ui.addWatch = req }
+            }
         }
     }
 }
@@ -140,20 +148,12 @@ struct DetailView: View {
     private var busy: Bool { center.isChecking || isUpdating }
 
     private var isHistory: Bool { ui.sidebar == .history }
-    /// §21 当前来源分区是否处于"已安装"模式（"全部" / "应用" / 历史 永远为 false）。
-    private var isInstalledMode: Bool {
-        guard let kind, kind != .app else { return false }
-        return ui.mode(for: kind) == .installed
-    }
-    /// 当前分区有"已关注 | 已安装"分段控件。
-    private var hasModePicker: Bool { kind != nil && kind != .app }
 
     private var subtitle: String {
         if isHistory {
             let n = history.records.count
             return n > 0 ? "更新历史 · \(n) 条" : "更新历史"
         }
-        if isInstalledMode { return "\(ui.sidebar?.title ?? "") · 已安装" }
         let staged = baseItems.filter { $0.status.isStaged }.count
         let n = actionableInView.count - staged
         let name = ui.sidebar?.title ?? "全部"
@@ -173,21 +173,16 @@ struct DetailView: View {
         }
         .navigationTitle("Xup")
         .navigationSubtitle(subtitle)
-        .searchable(text: $ui.search, placement: .toolbar,
-                    prompt: isHistory ? "搜索名称或错误信息" : isInstalledMode ? "搜索已安装的\(kind?.installedNoun ?? "")" : "搜索名称或来源")
+        .searchable(text: $ui.search, placement: .toolbar, prompt: isHistory ? "搜索名称或错误信息" : "搜索名称或来源")
         .toolbar { if isHistory { historyToolbar } else { toolbar } }
         .background(shortcutButtons)
         .onChange(of: center.isChecking) { _, checking in
-            if checking { ui.showLog = true } else { ui.installedCache = [:] }   // 检查后版本可能变化，已安装清单重新读取
+            if checking { ui.showLog = true } else { ui.installedCache = [:] }   // 检查后版本可能变化，添加 Sheet 的清单重新读取
         }
         .onChange(of: center.updatingIDs.isEmpty) { _, empty in
             if !empty { ui.showLog = true } else { ui.installedCache = [:] }
         }
-        .onChange(of: ui.sidebar) { _, _ in
-            ui.selection = []
-            // 离开处于"已安装"模式的分区时，若改过关注列表则检查一次。
-            ui.recheckIfNeeded(center: center)
-        }
+        .onChange(of: ui.sidebar) { _, _ in ui.selection = [] }
         .alert(item: $pendingConfirm) { p in
             Alert(title: Text("确认更新"), message: Text(p.message),
                   primaryButton: .default(Text(p.button)) { ui.update(ids: p.ids, center: center) },
@@ -198,16 +193,8 @@ struct DetailView: View {
     private var listAndLog: some View {
         VSplitView {
             VStack(spacing: 0) {
-                if let kind, isInstalledMode {
-                    // §21 "已安装"模式：嵌入单来源清单（搜索由工具栏搜索框驱动），自带底部工具条，不显示状态栏。
-                    InstalledListView(kind: kind, query: $ui.search)
-                        .id(kind)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(nsColor: .controlBackgroundColor))
-                } else {
-                    content.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    StatusBarView(kind: kind, visibleItems: items)
-                }
+                content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                StatusBarView(kind: kind, visibleItems: items)
             }
             .frame(minHeight: 160)
             if ui.showLog {
@@ -232,11 +219,11 @@ struct DetailView: View {
         } else if kind == .app, settings.managedApps.isEmpty {
             EmptyStates.NoApps(addApps: addApps)
         } else if let kind, center.untrackedKinds.contains(kind) {
-            EmptyStates.Untracked(kind: kind) { showInstalled(kind: kind) }
+            EmptyStates.Untracked(kind: kind) { ui.presentAddWatch(kind: kind) }
         } else if kind == nil, allSourcesUnavailable, settings.managedApps.isEmpty {
             EmptyStates.NoSources(addApps: addApps)
         } else if kind == nil, nothingTracked {
-            EmptyStates.Welcome(pick: { showInstalled(kind: nil) }, addApps: addApps)
+            EmptyStates.Welcome(pick: { ui.presentAddWatch(kind: nil) }, addApps: addApps)
         } else if center.isChecking, baseItems.isEmpty {
             EmptyStates.Checking(sources: ProviderKind.sidebarOrder.filter { !center.unavailable.contains($0) && !center.untrackedKinds.contains($0) }.map(\.title))
         } else if center.lastChecked == nil, center.items.isEmpty {
@@ -244,7 +231,7 @@ struct DetailView: View {
         } else if let kind, let err = center.providerErrors[kind], baseItems.isEmpty {
             EmptyStates.ProviderFailed(kind: kind, message: err) { ui.check(center: center) }
         } else if items.isEmpty, !ui.search.isEmpty {
-            EmptyStates.NoResults(query: ui.search, clear: { ui.search = "" }, pick: { showInstalled(kind: kind) })
+            EmptyStates.NoResults(query: ui.search, clear: { ui.search = "" }, pick: { ui.presentAddWatch(kind: kind) })
         } else if items.isEmpty {
             EmptyStates.AllUpToDate(total: center.items.filter { kind == nil || $0.kind == kind }.count,
                                     lastChecked: center.lastChecked) { ui.check(center: center) }
@@ -255,15 +242,8 @@ struct DetailView: View {
         }
     }
 
-    /// §21：所有"选择软件…"入口都切到对应来源分区的"已安装"模式（nil / 应用 → Homebrew）。
-    private func showInstalled(kind: ProviderKind?) {
-        ui.showInstalled(kind: kind)
-    }
-
-    /// 当前分区的模式绑定（仅来源分区使用）。
-    private func modeBinding(_ kind: ProviderKind) -> Binding<SectionMode> {
-        Binding(get: { ui.mode(for: kind) }, set: { ui.setMode($0, for: kind, center: center) })
-    }
+    /// §21 工具栏"+"的提示：来源分区"添加 Homebrew…"，"全部"分区"添加软件…"。
+    private var addWatchTitle: String { kind.map { "添加 \($0.title)…" } ?? "添加软件…" }
 
     private var allSourcesUnavailable: Bool {
         ProviderKind.pickerOrder.allSatisfy { center.unavailable.contains($0) }
@@ -272,18 +252,6 @@ struct DetailView: View {
     // MARK: 工具栏
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        // §21 来源分区居中的"已关注 | 已安装"分段。
-        if let kind, hasModePicker {
-            ToolbarItem(placement: .principal) {
-                Picker("显示", selection: modeBinding(kind)) {
-                    Text("已关注").tag(SectionMode.watched)
-                    Text("已安装").tag(SectionMode.installed)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .help("已关注：Xup 检查更新的条目；已安装：本机全部已安装的\(kind.installedNoun)，勾选即关注")
-            }
-        }
         ToolbarItemGroup(placement: .primaryAction) {
             if center.isChecking {
                 ProgressView().controlSize(.small).help("正在检查更新…")
@@ -294,34 +262,29 @@ struct DetailView: View {
                     .keyboardShortcut("r", modifiers: .command)
             }
 
-            if !isInstalledMode {
-                Button { requestUpdate(selectedActionable) } label: {
-                    Label(selectedActionable.isEmpty ? "更新选中" : "更新选中 (\(selectedActionable.count))",
-                          systemImage: "arrow.down.circle")
-                }
-                .help("更新勾选的条目 (⌘U)")
-                .disabled(busy || selectedActionable.isEmpty)
-                .keyboardShortcut("u", modifiers: .command)
-
-                Button { requestUpdate(Set(actionableInView.map(\.id))) } label: {
-                    Label("全部更新", systemImage: "arrow.down.to.line")
-                }
-                .help("更新当前分区的全部可更新项 (⇧⌘U)")
-                .disabled(busy || actionableInView.isEmpty)
-                .keyboardShortcut("u", modifiers: [.command, .shift])
+            Button { requestUpdate(selectedActionable) } label: {
+                Label(selectedActionable.isEmpty ? "更新选中" : "更新选中 (\(selectedActionable.count))",
+                      systemImage: "arrow.down.circle")
             }
+            .help("更新勾选的条目 (⌘U)")
+            .disabled(busy || selectedActionable.isEmpty)
+            .keyboardShortcut("u", modifiers: .command)
+
+            Button { requestUpdate(Set(actionableInView.map(\.id))) } label: {
+                Label("全部更新", systemImage: "arrow.down.to.line")
+            }
+            .help("更新当前分区的全部可更新项 (⇧⌘U)")
+            .disabled(busy || actionableInView.isEmpty)
+            .keyboardShortcut("u", modifiers: [.command, .shift])
 
             if kind == .app {
                 Button(action: addApps) { Label("添加应用…", systemImage: "plus") }
                     .help("添加应用… (⌘N)")
                     .keyboardShortcut("n", modifiers: .command)
-                Button { removeApps(ui.selection) } label: { Label("移除", systemImage: "minus.circle") }
-                    .help("移除选中的应用 (⌫)")
-                    .disabled(isUpdating || selectedApps.isEmpty)
-            } else if kind == nil {
-                // "全部"分区没有"已安装"模式：此按钮切到 Homebrew 的"已安装"。
-                Button { showInstalled(kind: nil) } label: { Label("选择软件…", systemImage: "checklist") }
-                    .help("切到 Homebrew 分区的“已安装”模式，勾选要跟踪的软件 (⇧⌘N)")
+            } else {
+                // §21：来源分区 / "全部"分区的"+"弹出添加 Sheet（"全部"时带来源 Picker）。移除走右键"取消关注" / ⌫。
+                Button { ui.presentAddWatch(kind: kind) } label: { Label(addWatchTitle, systemImage: "plus") }
+                    .help("\(addWatchTitle) (⇧⌘N)：从本机已安装的软件中勾选要跟踪的条目")
                     .disabled(isUpdating)
                     .keyboardShortcut("n", modifiers: [.command, .shift])
             }
@@ -330,22 +293,15 @@ struct DetailView: View {
                 .help("显示/隐藏日志 (⌥⌘L)")
                 .keyboardShortcut("l", modifiers: [.command, .option])
 
-            if !isInstalledMode {
-                // §21 A：`全部 | 仅可更新` 绑定 ui.showUpToDate，紧挨搜索框。
-                Picker("筛选", selection: $settings.showUpToDate) {
-                    Text("全部").tag(true)
-                    Text("仅可更新").tag(false)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .help("全部：显示所有已关注的条目及当前版本；仅可更新：只显示有新版本的条目")
+            // §21 A：`全部 | 仅可更新` 绑定 ui.showUpToDate，紧挨搜索框。
+            Picker("筛选", selection: $settings.showUpToDate) {
+                Text("全部").tag(true)
+                Text("仅可更新").tag(false)
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .help("全部：显示所有已关注的条目及当前版本；仅可更新：只显示有新版本的条目")
         }
-    }
-
-    /// 选中行中的应用条目（工具栏"移除"按钮）。
-    private var selectedApps: Set<String> {
-        Set(items.filter { ui.selection.contains($0.id) && $0.kind == .app }.map(\.id))
     }
 
     /// §18 更新历史分区的工具栏：筛选 + 清空历史（搜索框由 `.searchable` 复用）。
@@ -373,10 +329,6 @@ struct DetailView: View {
                     .keyboardShortcut(KeyEquivalent(Character("\(i + 2)")), modifiers: .command)
             }
             Button("") { ui.sidebar = .history }.keyboardShortcut("9", modifiers: .command)
-            if let kind, hasModePicker {
-                // ⇧⌘N：来源分区切到"已安装"（"全部"分区由工具栏按钮承担）。
-                Button("") { ui.setMode(.installed, for: kind, center: center) }.keyboardShortcut("n", modifiers: [.command, .shift])
-            }
         }
         .frame(width: 0, height: 0)
         .opacity(0)
