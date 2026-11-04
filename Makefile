@@ -34,5 +34,13 @@ uninstall-cli:
 test:
 	swift test
 
+# 发布：正式签名（需设置 XUP_SIGN_IDENTITY）并打 zip 到 dist/（ditto 会覆盖同名 zip）
+release:
+	@test -n "$(XUP_SIGN_IDENTITY)" || { echo "请设置 XUP_SIGN_IDENTITY"; exit 1; }
+	XUP_SIGN_IDENTITY="$(XUP_SIGN_IDENTITY)" ./scripts/build-app.sh
+	mkdir -p dist
+	ditto -c -k --keepParent build/Xup.app "dist/Xup-$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Support/Info.plist)-arm64.zip"
+	ls -la dist
+
 clean:
 	rm -rf .build build

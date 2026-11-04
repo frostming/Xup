@@ -42,9 +42,19 @@ cp "$ROOT/Support/SKILL.md" "$CONTENTS/Resources/SKILL.md"
 cp "$ROOT/Support/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 
-echo "==> codesign (ad-hoc)"
-codesign --force --sign - "$CONTENTS/Helpers/xup"
-codesign --force --deep --sign - "$APP"
+# 签名：设置 XUP_SIGN_IDENTITY（如 "Developer ID Application: Xi Ming (A42PRR7Z3U)"）时用正式证书 +
+# 强化运行时 + 时间戳 + entitlements；否则 ad-hoc。
+if [[ -n "${XUP_SIGN_IDENTITY:-}" ]]; then
+  echo "==> codesign (Developer ID: $XUP_SIGN_IDENTITY)"
+  codesign --force --options runtime --timestamp --sign "$XUP_SIGN_IDENTITY" "$CONTENTS/Helpers/xup"
+  codesign --force --options runtime --timestamp --entitlements "$ROOT/Support/Xup.entitlements" \
+    --sign "$XUP_SIGN_IDENTITY" "$APP"
+  codesign --verify --deep --strict --verbose=2 "$APP"
+else
+  echo "==> codesign (ad-hoc)"
+  codesign --force --sign - "$CONTENTS/Helpers/xup"
+  codesign --force --deep --sign - "$APP"
+fi
 
 echo "完成: $APP"
 echo "CLI:  $CONTENTS/Helpers/xup"

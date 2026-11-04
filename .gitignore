@@ -6,3 +6,4 @@ build/
 *.dia
 *.swiftdeps
 .swiftpm/
+dist/
