@@ -323,3 +323,39 @@ body.dark .stage .window{filter:brightness(.8)}
 .ctx .mitem.dis{color:var(--tertiary)} .ctx .mitem.dis .sf{color:var(--tertiary)}
 .ctx .mitem.red{color:var(--red)} .ctx .mitem.red .sf{color:var(--red)}
 .ctx hr{border:0;border-top:1px solid var(--sep);margin:4px 6px}
+/* ===== §19 更新方式：策略标签、待安装状态、单选组、子菜单 ===== */
+:root{--blue:#0a7aff}
+body.dark{--blue:#2f8cff}
+.blue{color:var(--blue)}
+.st.blue{color:var(--blue)}
+.tag.policy{font-size:10px;height:16px;padding:0 6px;margin-left:6px;vertical-align:middle;flex:none;white-space:nowrap}
+.nm .t b .tag.policy{margin-left:6px}
+.nm .t .nl{display:flex;align-items:center;gap:0;min-width:0}
+.nm .t .nl b{min-width:0;flex:0 1 auto}
+.btn.prominent.install{height:20px;font-size:11px;padding:0 9px}
+/* radioGroup */
+.radios{display:flex;flex-direction:column;gap:7px}
+.radio{display:flex;align-items:flex-start;gap:8px;font-size:13px}
+.radio .dot{width:14px;height:14px;border-radius:50%;border:1px solid var(--control-border);background:var(--control);flex:none;margin-top:2px;position:relative}
+.radio .dot.on{background:var(--accent);border-color:var(--accent)}
+.radio .dot.on::after{content:"";position:absolute;left:4px;top:4px;width:5px;height:5px;border-radius:50%;background:#fff}
+.radio .lb2{display:flex;flex-direction:column;gap:2px;min-width:0}
+.radio .lb2 small{font-size:11px;color:var(--secondary);line-height:1.35}
+.radio.dis{color:var(--tertiary)} .radio.dis .dot{opacity:.45} .radio.dis .lb2 small{color:var(--tertiary)}
+.subtoggle{display:flex;align-items:center;gap:8px;margin:2px 0 0 22px;font-size:12px}
+.subtoggle.dis{color:var(--tertiary)}
+.cfg .ghd2{font-size:11px;font-weight:600;color:var(--secondary);padding:0 0 2px}
+.cfg .grp{display:flex;flex-direction:column;gap:6px;padding:10px 12px;background:var(--bg-content);border:1px solid var(--sep);border-radius:8px}
+.cfg .fields.compact{gap:10px}
+.cfg .srcsum{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--secondary)}
+.cfg .srcsum .tf{flex:1}
+/* 右键子菜单 */
+.ctx .mitem .chev{margin-left:auto;font-size:11px;color:var(--secondary)}
+.ctx .mitem.hl .chev{color:#fff}
+.ctx .mitem .ck{width:14px;flex:none;display:inline-flex;justify-content:center;font-size:11px}
+.ctx.sub{width:212px}
+.ctx .mitem.toggle{font-size:12px}
+.ctx .mitem .sw{margin-left:auto}
+/* 面板里的待安装行 */
+.prow .btn.install{margin-left:4px}
+.prow .sf.blue{color:var(--blue)}

@@ -38,8 +38,21 @@ enum ItemStatus: Equatable, Hashable {
     case updating
     case updated
     case failed(String)
+    /// §19.4 新版本已在后台下载、校验并暂存，等用户（或空闲自动安装）执行"安装并重启"。关联值为暂存的版本号。
+    case staged(String)
 
     var isOutdated: Bool { self == .outdated }
+
+    var isStaged: Bool {
+        if case .staged = self { return true }
+        return false
+    }
+
+    /// `.staged` 的版本号。
+    var stagedVersion: String? {
+        if case .staged(let v) = self { return v }
+        return nil
+    }
 
     var label: String {
         switch self {
@@ -50,12 +63,63 @@ enum ItemStatus: Equatable, Hashable {
         case .updating: return "更新中"
         case .updated: return "已更新"
         case .failed: return "失败"
+        case .staged: return "待安装"
         }
     }
 
     var message: String? {
         switch self {
         case .unknown(let s), .failed(let s): return s
+        case .staged(let v): return "已下载 \(v) · 待安装"
+        default: return nil
+        }
+    }
+}
+
+/// §19.1 每条目的更新方式。
+enum UpdatePolicy: String, Codable, CaseIterable, Hashable, Identifiable {
+    /// 定时检查只标记可更新，用户手动点"更新"。
+    case manual
+    /// 定时检查发现新版本后，等系统空闲再自动执行。
+    case auto
+    /// 仅应用：发现新版本立即后台下载并暂存，用户点"安装并重启"时才替换。
+    case autoDownload
+
+    var id: String { rawValue }
+
+    /// 菜单 / Picker 选项文字。
+    var title: String {
+        switch self {
+        case .manual: return "手动更新"
+        case .auto: return "空闲时自动更新"
+        case .autoDownload: return "自动下载，手动重启"
+        }
+    }
+
+    /// §19.6 策略小标签。
+    var shortTag: String {
+        switch self {
+        case .manual: return "手动"
+        case .auto: return "空闲自动"
+        case .autoDownload: return "自动下载"
+        }
+    }
+
+    /// Sheet 选项下的一句说明。
+    var explanation: String {
+        switch self {
+        case .manual: return "定时检查只把条目标为可更新并通知，你点“更新”才执行。"
+        case .auto: return "发现新版本后等系统空闲（一段时间没有键鼠输入或已锁屏）再自动执行；应用遵循下方“正在运行时”的处理方式。"
+        case .autoDownload: return "发现新版本立即在后台下载、校验并暂存，不替换、不退出应用；你点“安装并重启”时才完成更新。"
+        }
+    }
+
+    /// CLI 的别名：`auto-download` 也接受。
+    init?(cli raw: String) {
+        switch raw.lowercased() {
+        case "manual": self = .manual
+        case "auto": self = .auto
+        case "autodownload", "auto-download", "auto_download": self = .autoDownload
         default: return nil
         }
     }
@@ -85,7 +149,28 @@ struct UpdateItem: Identifiable, Hashable {
         self.hint = hint
     }
 
-    var isActionable: Bool { canUpdate && status.isOutdated }
+    /// 可一键更新：有新版本（或已暂存待安装）且 Xup 能替用户执行。
+    var isActionable: Bool { canUpdate && (status.isOutdated || status.isStaged) }
+
+    /// §19.1 来源是否支持"自动下载，手动重启"（Xup 自己下载替换的类型：Sparkle / electron-updater / 手动配置的四类）。
+    /// cask / App Store / 自更新 由 brew、mas 或应用自己一步完成，无法预下载。
+    var supportsStaging: Bool {
+        guard kind == .app, canUpdate, let d = detail else { return false }
+        return d.hasPrefix("Sparkle") || d.hasPrefix("electron-updater") || d.hasPrefix("自定义 · ")
+    }
+
+    /// `policies` 字典的键：应用用完整 id；其它来源除了完整 id 还回退到 `<kind>:<关注名>`（homebrew 的 token 不带 formula/cask 前缀）。
+    var policyKeys: [String] {
+        switch kind {
+        case .homebrew:
+            // id 形如 homebrew:formula/node；关注名是 token。
+            let suffix = String(id.dropFirst(kind.rawValue.count + 1))
+            let token = suffix.split(separator: "/", maxSplits: 1).last.map(String.init) ?? suffix
+            return [id, "\(kind.rawValue):\(token)"]
+        default:
+            return [id]
+        }
+    }
 }
 
 struct LogLine: Identifiable, Hashable {
@@ -191,14 +276,19 @@ struct ManagedApp: Codable, Identifiable, Hashable {
     var id: String { path }
     var path: String
     var restartAfterUpdate: Bool = true
+    /// §19.1 子开关：策略为 autoDownload 时，暂存完成的包在系统空闲且应用未运行时自动安装。默认关。
+    var installWhenIdle: Bool = false
     /// 手动配置的更新来源；nil 表示自动识别。旧数据没有该字段，解码时为 nil。
     var source: AppUpdateSource? = nil
 
     var name: String { (path as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "") }
+    /// `policies` 字典与 UpdateItem.id 共用的键。
+    var itemID: String { "app:\(path)" }
 
-    init(path: String, restartAfterUpdate: Bool = true, source: AppUpdateSource? = nil) {
+    init(path: String, restartAfterUpdate: Bool = true, installWhenIdle: Bool = false, source: AppUpdateSource? = nil) {
         self.path = path
         self.restartAfterUpdate = restartAfterUpdate
+        self.installWhenIdle = installWhenIdle
         self.source = source
     }
 
@@ -207,6 +297,7 @@ struct ManagedApp: Codable, Identifiable, Hashable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         path = try c.decode(String.self, forKey: .path)
         restartAfterUpdate = try c.decodeIfPresent(Bool.self, forKey: .restartAfterUpdate) ?? true
+        installWhenIdle = try c.decodeIfPresent(Bool.self, forKey: .installWhenIdle) ?? false
         source = try c.decodeIfPresent(AppUpdateSource.self, forKey: .source)
     }
 }

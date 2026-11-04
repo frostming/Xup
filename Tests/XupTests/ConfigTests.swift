@@ -15,7 +15,9 @@ final class ConfigTests: XCTestCase {
     func testRoundTripWithAllSourceTypes() throws {
         var cfg = XupConfig()
         cfg.check.intervalMinutes = 720
-        cfg.check.autoUpdate = true
+        cfg.check.defaultPolicy = .auto
+        cfg.check.idleMinutes = 10
+        cfg.policies = ["homebrew:node": .auto, "app:/Applications/B.app": .autoDownload]
         cfg.homebrew.greedy = true
         cfg.electron.deltaDownload = false
         cfg.electron.keepVersionsPerApp = 3
@@ -24,7 +26,7 @@ final class ConfigTests: XCTestCase {
         cfg.tracked[.plugin] = ["claude/foo@bar"]
         cfg.apps = [
             ManagedApp(path: "/Applications/A.app", restartAfterUpdate: true, source: nil),
-            ManagedApp(path: "/Applications/B.app", restartAfterUpdate: false, source: .githubReleases(repo: "owner/repo", assetPattern: "*arm64*.dmg")),
+            ManagedApp(path: "/Applications/B.app", restartAfterUpdate: false, installWhenIdle: true, source: .githubReleases(repo: "owner/repo", assetPattern: "*arm64*.dmg")),
             ManagedApp(path: "/Applications/C.app", source: .tauri(url: URL(string: "https://example.com/latest.json")!)),
             ManagedApp(path: "/Applications/D.app", source: .electronYML(url: URL(string: "https://example.com/latest-mac.yml")!)),
             ManagedApp(path: "/Applications/E.app", source: .appcast(url: URL(string: "https://example.com/appcast.xml")!)),

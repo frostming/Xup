@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Xup · 更新方式</title><link rel="stylesheet" href="mac.css">
+<style>.sec-title{color:#fff;font-size:15px;font-weight:600;margin:40px 0 14px;text-shadow:0 1px 2px rgba(0,0,0,.3)}.cap{color:#fff;font-size:12px;font-weight:600;margin:0 0 8px;opacity:.9}.grid>div{max-width:440px}.scene{display:flex;flex-direction:column;align-items:flex-end;gap:10px;width:420px}.scene .menubar{width:100%}</style></head>
+<body>
+<div class="nav"><b>Xup 原型</b><a href="main.html">主窗口</a><a href="menubar.html">菜单栏</a><a href="settings.html">设置</a><a href="states.html">状态</a><a href="picker.html">选择软件</a><a href="app-source.html">应用来源</a><a class="on" href="policy.html">更新方式</a><span class="sp"></span><button id="theme">切换到深色</button></div>
+
+<h1 class="page">更新方式 — 每条目策略（DESIGN.md §19）</h1>
+<p class="lead">每个被关注的条目单独选：<b>手动更新</b>（默认）/ <b>空闲时自动更新</b> / 仅应用 <b>自动下载，手动重启</b>（含子开关"空闲且应用未运行时自动安装"）。全局只保留"新关注条目的默认更新方式"与"空闲判定"阈值。新状态"已下载，待安装"为蓝色，操作列常显 prominent 小按钮"安装并重启"。</p>
+
+<div class="sec-title">1 · 主窗口"全部"分区：待安装行、空闲自动标签、右键"更新方式"子菜单</div>
+<p class="note" style="margin-top:-6px">IINA 已在后台下载并校验好 1.5.0（策略：自动下载），排在所有"可更新"之前；node / typescript 策略为"空闲自动"，名称后带灰胶囊，hint 说明"将在空闲时自动更新"；Alma 策略为"自动下载"但尚在后台下载中，仍是橙色"可更新"。右键 node 行，子菜单勾选当前策略，"自动下载"项因为不是应用而不出现。手动策略的条目名称后不加任何标签。</p>
+
+<div class="window" style="width:920px;position:relative">
+  <div class="titlebar">
+    <div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div>
+    <span class="tb icon"><i class="sf" data-sf="sidebar.left"></i></span>
+    <div class="ttl"><b>Xup</b><span>全部 · 1 个待安装 · 5 个可更新</span></div>
+    <div class="toolbar">
+      <span class="tb"><i class="sf" data-sf="arrow.clockwise"></i>检查更新</span>
+      <span class="tb"><i class="sf" data-sf="arrow.down.circle"></i>更新选中 (1)</span>
+      <span class="tb"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</span>
+      <span class="tb"><i class="sf" data-sf="checklist"></i>选择软件…</span>
+      <span class="search"><i class="sf" data-sf="magnifyingglass"></i>搜索</span>
+      <span class="tb icon"><i class="sf" data-sf="terminal"></i></span>
+    </div>
+  </div>
+  <div class="split" style="height:470px">
+    <div class="sidebar">
+      <div class="srow sel"><i class="sf" data-sf="square.grid.2x2"></i><span class="name">全部</span><span class="badge orange">6</span></div>
+      <div class="sect">来源</div>
+      <div class="srow"><i class="sf" data-sf="mug"></i><span class="name">Homebrew</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="shippingbox"></i><span class="name">npm 全局</span><span class="badge orange">1</span></div>
+      <div class="srow dim" title="未检测到 uv"><i class="sf" data-sf="bolt"></i><span class="name">uv tool</span></div>
+      <div class="srow"><i class="sf" data-sf="cpu"></i><span class="name">Agents</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="sparkles"></i><span class="name">Skills</span><span class="badge orange">1</span></div>
+      <div class="srow"><i class="sf" data-sf="puzzlepiece.extension"></i><span class="name">插件</span></div>
+      <div class="srow"><i class="sf" data-sf="macwindow"></i><span class="name">应用</span><span class="badge orange">2</span></div>
+    </div>
+    <div class="content">
+      <div class="table">
+        <table>
+          <colgroup><col style="width:30px"><col><col style="width:88px"><col style="width:88px"><col style="width:210px"><col style="width:110px"></colgroup>
+          <thead><tr><th></th><th>名称</th><th>已安装</th><th>最新</th><th class="sorted">状态</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="macwindow"></i><div class="t"><div class="nl"><b>IINA</b><span class="tag policy" title="自动下载，手动重启 · 空闲且未运行时自动安装">自动下载</span></div><small>Sparkle · iina.io</small></div></div></td>
+              <td class="ver">1.4.0</td><td class="ver new">1.5.0</td>
+              <td><div class="st blue" title="新版本已在后台下载并校验完成，点"安装并重启"即可"><i class="sf" data-sf="arrow.down.circle.fill"></i>已下载 1.5.0 · 待安装</div></td>
+              <td><div class="row-actions"><span class="btn prominent install" title="退出 IINA → 替换 → 重新打开，只需几秒">安装并重启</span></div></td></tr>
+            <tr class="sel"><td><span class="cb on"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><div class="nl"><b>node</b><span class="tag policy" title="空闲时自动更新：无操作 5 分钟后自动执行">空闲自动</span></div><small>formula</small></div></div></td>
+              <td class="ver">22.1.0</td><td class="ver new">22.3.0</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新<span class="msg">· 将在空闲时自动更新</span></div></td>
+              <td><div class="row-actions"><span class="btn hover show">更新</span></div></td></tr>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="shippingbox"></i><div class="t"><div class="nl"><b>typescript</b><span class="tag policy" title="空闲时自动更新：无操作 5 分钟后自动执行">空闲自动</span></div><small>npm -g</small></div></div></td>
+              <td class="ver">5.5.4</td><td class="ver new">5.6.2</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新<span class="msg">· 将在空闲时自动更新</span></div></td>
+              <td><div class="row-actions"><span class="btn hover">更新</span></div></td></tr>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="macwindow"></i><div class="t"><div class="nl"><b>Alma</b><span class="tag policy" title="自动下载，手动重启">自动下载</span></div><small>electron-updater · updates.alma.now</small></div></div></td>
+              <td class="ver">0.9.4</td><td class="ver new">0.9.6</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新<span class="msg">· 后台下载中 62%</span></div></td>
+              <td><div class="row-actions"><span class="btn hover">更新</span></div></td></tr>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="cpu"></i><div class="t"><b>Claude Code</b><small>~/.npm-global/bin/claude</small></div></div></td>
+              <td class="ver">1.0.3</td><td class="ver new">1.0.5</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新</div></td>
+              <td><div class="row-actions"><span class="btn hover">更新</span></div></td></tr>
+            <tr><td><span class="cb"></span></td>
+              <td><div class="nm"><i class="sf" data-sf="sparkles"></i><div class="t"><b>ui-ux-pro-max</b><small>nextlevelbuilder/ui-ux-pro-max-skill</small></div></div></td>
+              <td class="ver">10-21</td><td class="ver new">11-02</td>
+              <td><div class="st orange"><i class="sf" data-sf="arrow.up.circle.fill"></i>可更新<span class="msg">· 远端有 3 个新提交</span></div></td>
+              <td><div class="row-actions"><span class="btn hover">更新</span></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><b>python@3.12</b><small>formula</small></div></div></td>
+              <td class="ver">3.12.4</td><td class="ver">3.12.7</td>
+              <td><div class="st sec" title="已 pin，跳过"><i class="sf" data-sf="pin.fill"></i>可更新<span class="msg">· 已 pin，跳过</span></div></td>
+              <td><div class="row-actions"><i class="sf sec" data-sf="info.circle"></i></div></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="mug"></i><div class="t"><b>ripgrep</b><small>formula</small></div></div></td>
+              <td class="ver">14.1.1</td><td class="ver">14.1.1</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.seal.fill"></i>已更新<span class="msg">· 今天 03:12 自动更新</span></div></td>
+              <td></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="shippingbox"></i><div class="t"><b>pnpm</b><small>npm -g</small></div></div></td>
+              <td class="ver">9.12.0</td><td class="ver">9.12.0</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td></td></tr>
+            <tr><td></td>
+              <td><div class="nm"><i class="sf" data-sf="macwindow"></i><div class="t"><b>Google Chrome</b><small>Homebrew cask google-chrome</small></div></div></td>
+              <td class="ver">130.0.6723</td><td class="ver">130.0.6723</td>
+              <td><div class="st green"><i class="sf" data-sf="checkmark.circle.fill"></i>最新</div></td>
+              <td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="statusbar">
+        <span>共 10 项 · 1 个待安装 · 5 个可更新</span><span class="sp"></span><span title="下一次自动检查：15:12 · 2 项将在空闲时自动更新">上次检查 今天 09:12 · 2 项等待空闲</span>
+      </div>
+    </div>
+  </div>
+  <!-- 右键菜单：node 行 -->
+  <div class="ctx" style="left:470px;top:150px">
+    <div class="mitem"><i class="sf" data-sf="arrow.down.circle"></i>更新</div>
+    <div class="mitem hl"><i class="sf" data-sf="clock.arrow.circlepath"></i>更新方式<i class="sf chev" data-sf="chevron.right"></i></div>
+    <hr>
+    <div class="mitem"><i class="sf" data-sf="folder"></i>在 Finder 中显示</div>
+    <div class="mitem"><i class="sf" data-sf="doc.on.doc"></i>复制名称</div>
+    <div class="mitem"><i class="sf" data-sf="doc.on.doc"></i>复制版本</div>
+    <hr>
+    <div class="mitem"><i class="sf" data-sf="eye.slash"></i>取消关注</div>
+  </div>
+  <!-- 子菜单：更新方式 -->
+  <div class="ctx sub" style="left:668px;top:174px">
+    <div class="mitem"><span class="ck"></span><i class="sf" data-sf="hand.raised"></i>手动更新</div>
+    <div class="mitem"><span class="ck"><i class="sf" data-sf="checkmark"></i></span><i class="sf" data-sf="moon.zzz"></i>空闲时自动更新</div>
+  </div>
+</div>
+
+<p class="note">应用行的子菜单多一项"自动下载，手动重启"（<code>arrow.down.circle.dotted</code>），其后分隔线 + Toggle 项"空闲且应用未运行时自动安装"（仅当前策略为自动下载时可用）。多选时子菜单作用于全部选中行：策略不一致 → 全部无勾；含非应用 → "自动下载"禁用。Homebrew cask / App Store 应用的"自动下载"禁用（由 brew / mas 一步安装，无法预下载）。</p>
+
+<div class="grid" style="margin-top:18px">
+  <div>
+    <p class="cap">1b · 应用行的子菜单（IINA，当前为"自动下载"，子开关已开）</p>
+    <div class="ctx sub" style="position:static;width:252px">
+      <div class="mitem"><span class="ck"></span><i class="sf" data-sf="hand.raised"></i>手动更新</div>
+      <div class="mitem"><span class="ck"></span><i class="sf" data-sf="moon.zzz"></i>空闲时自动更新</div>
+      <div class="mitem"><span class="ck"><i class="sf" data-sf="checkmark"></i></span><i class="sf" data-sf="arrow.down.circle.dotted"></i>自动下载，手动重启</div>
+      <hr>
+      <div class="mitem toggle"><span class="ck"></span>空闲且应用未运行时自动安装<span class="sw on"></span></div>
+    </div>
+  </div>
+  <div>
+    <p class="cap">1c · 多选 3 行（含 node、IINA、typescript）：策略不一致 → 无勾；含非应用 → "自动下载"禁用</p>
+    <div class="ctx sub" style="position:static;width:252px">
+      <div class="mitem"><span class="ck"></span><i class="sf" data-sf="hand.raised"></i>手动更新</div>
+      <div class="mitem"><span class="ck"></span><i class="sf" data-sf="moon.zzz"></i>空闲时自动更新</div>
+      <div class="mitem dis" title="所选条目中含非应用"><span class="ck"></span><i class="sf" data-sf="arrow.down.circle.dotted"></i>自动下载，手动重启</div>
+    </div>
+    <p class="note" style="margin:8px 0 0">选择后状态栏闪 3 秒：<code>已将 3 项设为"空闲时自动更新"</code>。</p>
+  </div>
+</div>
+
+<div class="sec-title">2 · 应用设置 Sheet：新增「更新方式」分组（位于「应用正在运行时」上方）</div>
+<p class="note" style="margin-top:-6px">radioGroup 三项各带一句说明；第三项下缩进一个子开关，仅第三项选中时可用。来源不支持预下载时第三项禁用并说明原因。「更新来源」分组保持 §16.3 的内容，此处只画折叠后的摘要。</p>
+
+<div class="grid">
+  <div>
+    <p class="cap">2.1 IINA（Sparkle，可预下载）：自动下载 + 子开关开</p>
+    <div class="sheet cfg">
+      <div class="apphd">
+        <span class="appicon" style="background:linear-gradient(#444,#111)">II</span>
+        <div class="t"><b>配置 IINA</b><small>/Applications/IINA.app · 已安装 1.4.0</small></div>
+        <span class="tag" title="Xup 自动识别的结果">自动识别：Sparkle</span>
+      </div>
+      <div class="fields compact">
+        <div>
+          <div class="ghd2">更新方式</div>
+          <div class="grp">
+            <div class="radios">
+              <div class="radio"><span class="dot"></span><div class="lb2">手动更新<small>发现新版本只提示，由你点"更新"。</small></div></div>
+              <div class="radio"><span class="dot"></span><div class="lb2">空闲时自动更新<small>无操作 5 分钟后自动更新；运行中按下方"应用正在运行时"处理。</small></div></div>
+              <div class="radio"><span class="dot on"></span><div class="lb2">自动下载，手动重启<small>后台下载并校验好新版本，不退出应用；列表显示"待安装"，由你点"安装并重启"。</small></div></div>
+            </div>
+            <div class="subtoggle"><span class="sw on"></span>空闲且应用未运行时自动安装<span class="annot">默认关</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="ghd2">应用正在运行时</div>
+          <div class="grp">
+            <div class="radios">
+              <div class="radio"><span class="dot on"></span><div class="lb2">自动退出并重新打开</div></div>
+              <div class="radio"><span class="dot"></span><div class="lb2">等我关闭后再更新</div></div>
+            </div>
+            <div class="frm" style="min-height:0"><div class="help">"安装并重启"时同样遵循此选项；选"等我关闭"则按钮文字变为"安装"，并在应用退出后执行。</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="ghd2">更新来源</div>
+          <div class="grp">
+            <div class="srcsum"><span>Sparkle appcast（自动识别）</span><span class="tf"><i class="sf" data-sf="link"></i>https://iina.io/appcast.xml</span></div>
+            <div class="frm" style="min-height:0"><div class="help">自动识别可用，无需手动配置。如需覆盖，选择来源类型后填写。</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="sft">
+        <span class="btn plain red dis" title="仅已有手动配置时可用">移除配置</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">保存</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="cap">2.2 Google Chrome（Homebrew cask，不可预下载）：空闲自动；第三项禁用</p>
+    <div class="sheet cfg">
+      <div class="apphd">
+        <span class="appicon" style="background:linear-gradient(#4af,#06c)">Ch</span>
+        <div class="t"><b>配置 Google Chrome</b><small>/Applications/Google Chrome.app · 已安装 130.0.6723</small></div>
+        <span class="tag">自动识别：Homebrew cask</span>
+      </div>
+      <div class="fields compact">
+        <div>
+          <div class="ghd2">更新方式</div>
+          <div class="grp">
+            <div class="radios">
+              <div class="radio"><span class="dot"></span><div class="lb2">手动更新<small>发现新版本只提示，由你点"更新"。</small></div></div>
+              <div class="radio"><span class="dot on"></span><div class="lb2">空闲时自动更新<small>无操作 5 分钟后自动更新；运行中按下方"应用正在运行时"处理。</small></div></div>
+              <div class="radio dis"><span class="dot"></span><div class="lb2">自动下载，手动重启<small>该应用由 Homebrew 执行安装，不支持预下载。</small></div></div>
+            </div>
+            <div class="subtoggle dis"><span class="sw dis"></span>空闲且应用未运行时自动安装</div>
+          </div>
+        </div>
+        <div>
+          <div class="ghd2">应用正在运行时</div>
+          <div class="grp">
+            <div class="radios">
+              <div class="radio"><span class="dot"></span><div class="lb2">自动退出并重新打开</div></div>
+              <div class="radio"><span class="dot on"></span><div class="lb2">等我关闭后再更新</div></div>
+            </div>
+            <div class="frm" style="min-height:0"><div class="help">空闲时若 Chrome 仍在运行，本轮跳过，5 分钟后复查，最晚到下次检查周期。</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="ghd2">更新来源</div>
+          <div class="grp">
+            <div class="srcsum"><span>Homebrew cask（自动识别）</span><span class="tf mono">brew upgrade --cask google-chrome</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="sft">
+        <span class="btn plain red dis">移除配置</span>
+        <span class="sp"></span>
+        <span class="btn lg">取消</span><span class="btn lg prominent">保存</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec-title">3 · 设置 › 通用：默认更新方式 Picker + 空闲判定 Stepper（替代原"发现更新时自动更新"开关）</div>
+<div class="window settings">
+  <div class="titlebar">
+    <div class="tbtop"><div class="traffic"><i class="c"></i><i class="m"></i><i class="z"></i></div><b>通用</b></div>
+    <div class="tabs">
+      <div class="tab on"><i class="sf" data-sf="gearshape"></i>通用</div>
+      <div class="tab"><i class="sf" data-sf="checklist"></i>软件</div>
+      <div class="tab"><i class="sf" data-sf="cpu"></i>Agents</div>
+      <div class="tab"><i class="sf" data-sf="macwindow"></i>应用</div>
+    </div>
+  </div>
+  <div class="form">
+    <div class="gwrap"><div class="ghd">检查</div>
+      <div class="group">
+        <div class="frow"><div class="lbl">检查间隔</div><span class="popup">6 小时 <span class="ar">▲<br>▼</span></span></div>
+        <div class="frow"><div class="lbl">发现更新时通知</div><span class="sw on"></span></div>
+        <div class="frow"><div class="lbl">新关注条目的默认更新方式<small>只影响之后新关注的条目；已有条目保留各自的更新方式，可在列表右键"更新方式"中逐条修改。</small></div><span class="popup">手动更新 <span class="ar">▲<br>▼</span></span><span class="annot">新</span></div>
+        <div class="frow"><div class="lbl">空闲判定<small>"空闲时自动更新"的条目会等到这么久没有键盘鼠标输入后才开始更新；锁屏与屏幕保护视为空闲。</small></div><span class="sub">无操作</span><span class="stepper"><span class="tf">5</span><span class="pm">▲▼</span></span><span class="sub">分钟后视为空闲</span><span class="annot">新</span></div>
+      </div>
+    </div>
+    <div class="gwrap"><div class="ghd">Homebrew</div>
+      <div class="group">
+        <div class="frow"><div class="lbl">包含自动更新的 cask (--greedy)<small>把自带更新机制的应用（如 Chrome）也列为可更新。</small></div><span class="sw on"></span></div>
+      </div>
+    </div>
+    <div class="gwrap"><div class="ghd">显示</div>
+      <div class="group">
+        <div class="frow"><div class="lbl">显示已是最新的条目</div><span class="sw on"></span></div>
+        <div class="frow"><div class="lbl">登录时启动</div><span class="sw on"></span></div>
+      </div>
+    </div>
+    <div class="gwrap">
+      <div class="group">
+        <div class="frow"><div class="lbl">跟踪的软件</div><span class="sub">24 项</span><span class="btn">选择软件…</span></div>
+        <div class="frow"><div class="lbl">已下载待安装的更新<small>IINA 1.5.0 · Alma 0.9.6</small></div><span class="sub">2 项 · 186 MB</span><span class="btn">清除</span><span class="annot">v1 可选</span></div>
+        <div class="frow"><div class="lbl">版本</div><span class="sub">1.0 (12)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="note">Picker 两项：手动更新 / 空闲时自动更新（"自动下载"只能逐个应用选，不做默认）。默认策略为手动且当前没有任何条目为自动时，"空闲判定"整行 <code>.secondary</code> 但仍可改。</p>
+
+<div class="sec-title">4 · 菜单栏面板：待安装条目置顶并带按钮</div>
+<div class="row" style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+<div class="scene">
+  <p class="cap" style="align-self:flex-start">4.1 有 1 个待安装 + 4 个可更新</p>
+  <div class="menubar"><span class="sec">Wi‑Fi</span><span class="mbicon active"><i class="sf" data-sf="arrow.up.circle.fill"></i><span class="ct">5</span></span><span>周二 09:14</span></div>
+  <div class="panel">
+    <div class="hd"><i class="sf orange" data-sf="arrow.up.circle.fill"></i><div class="tt"><b>1 个待安装 · 4 个可更新</b><span>上次检查 今天 09:12 · 2 项等待空闲</span></div><span class="tb icon" title="检查更新"><i class="sf" data-sf="arrow.clockwise"></i></span></div>
+    <hr>
+    <div class="prow"><i class="sf blue" data-sf="arrow.down.circle.fill"></i><span class="n">IINA</span><span class="v">已下载 <b>1.5.0</b></span><span class="btn prominent install" title="退出 IINA → 替换 → 重新打开">安装并重启</span></div>
+    <div class="prow"><i class="sf" data-sf="mug"></i><span class="n">node <span class="tag policy" style="margin-left:4px">空闲自动</span></span><span class="v">22.1.0 → <b>22.3.0</b></span></div>
+    <div class="prow"><i class="sf" data-sf="shippingbox"></i><span class="n">typescript <span class="tag policy" style="margin-left:4px">空闲自动</span></span><span class="v">5.5.4 → <b>5.6.2</b></span></div>
+    <div class="prow"><i class="sf" data-sf="macwindow"></i><span class="n">Alma</span><span class="v">后台下载中 62%</span></div>
+    <div class="prow"><i class="sf" data-sf="cpu"></i><span class="n">Claude Code</span><span class="v">1.0.3 → <b>1.0.5</b></span></div>
+    <hr>
+    <div style="display:flex;gap:8px"><div class="full"><i class="sf" data-sf="macwindow"></i>打开 Xup</div><div class="full bordered" style="color:var(--primary)"><i class="sf" data-sf="arrow.down.to.line"></i>全部更新</div></div>
+    <hr>
+    <div class="mitem">检查更新<span class="sp"></span><kbd>⌘R</kbd></div>
+    <div class="mitem">设置…<span class="sp"></span><kbd>⌘,</kbd></div>
+    <div class="mitem">退出 Xup<span class="sp"></span><kbd>⌘Q</kbd></div>
+  </div>
+</div>
+
+<div class="scene">
+  <p class="cap" style="align-self:flex-start">4.2 空闲时正在自动更新（用户回来时看到的）</p>
+  <div class="menubar"><span class="sec">Wi‑Fi</span><span class="mbicon active" style="opacity:.7"><i class="sf" data-sf="arrow.triangle.2.circlepath"></i></span><span>周二 09:14</span></div>
+  <div class="panel">
+    <div class="hd"><span class="spinner accent" style="margin:4px 5px 0 3px"></span><div class="tt"><b>正在自动更新 typescript (2/2)</b><span>空闲 7 分钟后开始 · 1 已完成</span></div></div>
+    <div class="prog" style="width:100%;margin:8px 0 2px"><i style="width:70%"></i></div>
+    <hr>
+    <div class="prow"><i class="sf green" data-sf="checkmark.seal.fill"></i><span class="n">node</span><span class="v">已更新到 <b>22.3.0</b></span></div>
+    <div class="prow"><span class="spinner sm accent" style="margin:0 2px"></span><span class="n">typescript</span><span class="v">更新中</span></div>
+    <div class="prow"><i class="sf blue" data-sf="arrow.down.circle.fill"></i><span class="n">IINA</span><span class="v">已下载 <b>1.5.0</b></span><span class="btn prominent install dis">安装并重启</span></div>
+    <hr>
+    <div class="full"><i class="sf" data-sf="macwindow"></i>打开 Xup</div>
+    <hr>
+    <div class="mitem disabled" style="opacity:.5">检查更新<span class="sp"></span><kbd>⌘R</kbd></div>
+    <div class="mitem">设置…<span class="sp"></span><kbd>⌘,</kbd></div>
+    <div class="mitem">退出 Xup<span class="sp"></span><kbd>⌘Q</kbd></div>
+  </div>
+</div>
+</div>
+
+<div class="sec-title">5 · 设置 › 软件：行尾策略小标签，点击弹出菜单修改</div>
+<div class="card" style="width:560px">
+  <h4>软件 Tab（WatchListPane）· Homebrew 分段 · 已关注行显示策略标签（含"手动"），未关注行不显示</h4>
+  <div class="prow2"><span class="cb on"></span><div class="t"><b>node</b><small>formula</small></div><span class="tag policy" style="margin:0" title="点击修改更新方式">空闲自动</span><span class="ver">22.1.0</span></div>
+  <div class="prow2"><span class="cb on"></span><div class="t"><b>python@3.12</b><small>formula · 已 pin，跳过</small></div><span class="tag policy dis" style="margin:0;opacity:.5" title="已 pin，策略不生效">手动</span><span class="ver">3.12.4</span></div>
+  <div class="prow2" style="position:relative"><span class="cb on"></span><div class="t"><b>ripgrep</b><small>formula</small></div><span class="tag policy" style="margin:0;background:var(--accent-soft);color:var(--accent)">手动</span><span class="ver">14.1.1</span>
+    <div class="ctx sub" style="left:348px;top:28px;width:176px"><div class="mitem"><span class="ck"><i class="sf" data-sf="checkmark"></i></span><i class="sf" data-sf="hand.raised"></i>手动更新</div><div class="mitem hl"><span class="ck"></span><i class="sf" data-sf="moon.zzz"></i>空闲时自动更新</div></div></div>
+  <div class="prow2"><span class="cb"></span><div class="t"><b>wget</b><small>formula</small></div><span class="ver">1.24.5</span></div>
+  <div class="prow2" style="height:62px"></div>
+</div>
+
+<div class="sec-title">6 · 通知</div>
+<div class="grid">
+  <div><p class="cap">自动更新完成</p><div class="notif"><div class="ic" style="background:var(--green)"><i class="sf" data-sf="checkmark.seal.fill"></i></div><div><b>已自动更新 2 项</b><span>node、typescript 已在你离开时更新到最新版本。</span></div><small>刚刚</small></div></div>
+  <div><p class="cap">已下载待安装</p><div class="notif"><div class="ic" style="background:var(--blue)"><i class="sf" data-sf="arrow.down.circle.fill"></i></div><div><b>IINA 1.5.0 已下载</b><span>新版本已准备好。点击"安装并重启"完成更新，只需几秒。</span></div><small>3 分钟前</small></div></div>
+  <div><p class="cap">自动更新失败</p><div class="notif"><div class="ic" style="background:var(--red)"><i class="sf" data-sf="xmark.circle.fill"></i></div><div><b>自动更新失败：IINA</b><span>校验失败：签名不匹配。原版本未受影响。</span></div><small>03:12</small></div></div>
+  <div><p class="cap">暂存包失效</p><div class="notif"><div class="ic" style="background:var(--orange)"><i class="sf" data-sf="exclamationmark.triangle.fill"></i></div><div><b>IINA 的更新包需要重新下载</b><span>已下载的 1.5.0 校验失败，Xup 会在下次检查时重新下载。</span></div><small>09:12</small></div></div>
+</div>
+
+<p class="note" style="margin-top:36px">规则速记：自动更新只由<b>定时检查</b>触发；不空闲则每 5 分钟复查，最晚推迟到下次检查周期开始；用户手动"检查更新"不触发自动更新。自动下载不需要空闲（下载不打扰人），安装才需要。"待安装"计入角标与"全部更新"，默认排序在"可更新"之前。暂存目录 <code>~/Library/Application Support/Xup/Staged/&lt;bundleID&gt;/&lt;version&gt;/</code>，每应用保留一个版本，30 天未安装或校验失败即失效。config：<code>policies[itemID]</code>、<code>apps[].installWhenIdle</code>、<code>check.defaultPolicy</code>、<code>check.idleMinutes</code>。</p>
+
+<script src="sf.js"></script>
+</body></html>

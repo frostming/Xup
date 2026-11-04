@@ -49,6 +49,8 @@ enum XupScenes {
             content
                 .environmentObject(model)
                 .environmentObject(model.center)
+                .environmentObject(model.history)
+                .environmentObject(model.scheduler)
                 .environmentObject(model.settings)
                 .environmentObject(ui)
         }

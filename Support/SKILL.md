@@ -26,19 +26,22 @@ Xup 是菜单栏常驻的统一更新器，只检查/更新用户**关注**的�
 {
   "$schema": "./config.schema.json",
   "version": 1,
-  "check":    { "intervalMinutes": 360, "notify": true, "autoUpdate": false },
+  "check":    { "intervalMinutes": 360, "notify": true, "defaultPolicy": "manual", "idleMinutes": 5 },
   "homebrew": { "greedy": false },
   "ui":       { "showUpToDate": false, "launchAtLogin": false },
   "electron": { "deltaDownload": true, "keepVersionsPerApp": 1 },
   "agent":    { "allowUpdates": false },
   "tracked":  { "homebrew": ["node"], "npm": [], "uv": ["nox"], "agent": ["claude"], "skill": [], "plugin": [] },
   "apps": [
-    { "path": "/Applications/IINA.app", "restartAfterUpdate": true, "source": null },
-    { "path": "/Applications/Kaze.app", "restartAfterUpdate": true,
+    { "path": "/Applications/IINA.app", "restartAfterUpdate": true, "installWhenIdle": false, "source": null },
+    { "path": "/Applications/Kaze.app", "restartAfterUpdate": true, "installWhenIdle": false,
       "source": { "type": "githubReleases", "repo": "owner/repo", "assetPattern": "*arm64*.dmg" } }
-  ]
+  ],
+  "policies": { "homebrew:node": "auto", "uv:nox": "auto", "app:/Applications/IINA.app": "autoDownload" }
 }
 ```
+
+`policies` 是每条目的**更新方式**（见下文），键为条目 id；缺省条目取 `check.defaultPolicy`。旧字段 `check.autoUpdate` 已废弃：App 读到 `true` 会迁移为 `defaultPolicy: "auto"` 并给当时所有条目写 `auto`，然后删除旧键。
 
 `source` 的四种形态：`{"type":"githubReleases","repo":"owner/repo","assetPattern":"*.dmg"}`、`{"type":"tauri","url":"https://…/latest.json"}`、`{"type":"electronYML","url":"https://…/latest-mac.yml"}`、`{"type":"appcast","url":"https://…/appcast.xml"}`；`null` 表示自动识别。
 
@@ -67,7 +70,10 @@ xup status
 xup items [--kind k]
 xup check [--kind k,...] [--wait]
 xup update <id>... | --all [--wait] [--yes]
+xup stage <id>... [--wait]
+xup policy list | get <id> | set <id>... manual|auto|auto-download [--install-when-idle on|off]
 xup log [--tail N] [--errors]
+xup history [--tail N] [--failed] [--kind k] | clear --yes
 xup launch <app-path>
 xup reload-config
 xup skill install | show | path
@@ -117,10 +123,51 @@ xup items --kind homebrew --json
 xup log --tail 100 --errors
 ```
 
+## 更新方式（每条目策略）
+
+每个被关注的条目单独选更新方式；全局只有"新关注条目的默认值"（`check.defaultPolicy`，`manual` / `auto`）与空闲阈值（`check.idleMinutes`，1–60 分钟）。
+
+| 值 | 含义 | 适用 |
+|---|---|---|
+| `manual`（默认） | 定时检查只把条目标为可更新并通知，用户点"更新"才执行 | 所有条目 |
+| `auto` | 定时检查发现新版本后，等系统**空闲**（无键鼠输入 ≥ idleMinutes 分钟，或锁屏/屏保）再自动执行；应用遵循 `restartAfterUpdate` | 所有条目 |
+| `autoDownload` | 发现新版本立即后台下载、校验并暂存（`~/Library/Caches/dev.fming.xup/staged/<bundleID>/<version>/`），**不替换、不退出应用**；条目状态变为 `staged`，`xup update <id>` / 界面"安装并重启"才替换。子开关 `apps[].installWhenIdle` 打开时，空闲且应用未运行会自动完成安装 | 仅 Sparkle / electron-updater / 手动配置来源的应用；cask / App Store / 自更新读到时按 `auto` 处理并写日志 |
+
+```bash
+xup policy list --json                                  # {defaultPolicy, idleMinutes, items:[{id, policy, inherited, installWhenIdle?}]}
+xup policy get uv:nox --json
+xup policy set uv:nox homebrew:node auto                 # 直接写 config.json，App 热加载
+xup policy set app:/Applications/IINA.app auto-download --install-when-idle on
+xup config set check.defaultPolicy auto                 # 只影响之后新关注的条目
+xup config set check.idleMinutes 10
+xup stage app:/Applications/IINA.app --wait --json      # 立即预下载（只下载暂存，不替换、不退出应用）
+xup items --kind app --json | jq '.[] | select(.status=="staged")'   # 含 stagedVersion / policy
+xup update app:/Applications/IINA.app --wait --yes      # staged 条目直接安装（退出 → 替换 → 重开），不再下载
+```
+
+- 只有**定时检查**（含启动首检）会触发 `auto` / `autoDownload` 的自动行为；`xup check` 与界面"检查更新"不触发。
+- `xup status --json` 的 `items[].policy` 为生效策略（含降级），`counts.staged` 为待安装数，`pendingAuto` 为正在等空闲的条目 id。
+- 取消关注 / 移除应用会同时删除其 `policies` 记录与暂存；暂存超过 30 天或远端版本变化会作废并在下次检查重新下载。
+- homebrew 条目的键可写 `homebrew:node`（不区分 formula/cask）或 `homebrew:formula/node`；`brew:` 为别名。
+
+## 更新历史
+
+每次 `update`（无论界面、CLI 还是定时自动更新）成功或失败都会记一条到 `~/Library/Application Support/Xup/history.jsonl`（每行一条 JSON，最多保留 2000 条）。主窗口侧栏"记录 › 更新历史"与下列命令读的是同一份数据：
+
+```bash
+xup history --json                       # 最近 50 条，按时间倒序
+xup history --tail 200 --failed --json   # 只看失败；--kind homebrew|npm|uv|agent|skill|plugin|app 按来源过滤
+xup history clear --yes                  # 清空（不可撤销，必须 --yes）
+```
+
+每条记录的字段：`id`、`time`（ISO8601）、`kind`、`itemID`（与 `items` 的 id 一致，可直接用于 `xup update`）、`name`、`detail`（可选）、`fromVersion`、`toVersion`（失败时省略）、`duration`（秒）、`ok`、`error`（失败原因，成功时省略）、`trigger`（`manual` 界面 / `cli` 命令行 / `scheduled` 定时自动更新 / `auto` 启动时自动更新）。
+
+排查"昨天自动更新把什么弄坏了"时：`xup history --failed --json | jq '.[] | {time,itemID,fromVersion,error}'`，再用 `xup update <itemID> --wait --yes --json` 重试。
+
 ## 安全约定
 
 - `xup update` 会真正修改本机软件（brew upgrade、npm install -g、替换 /Applications 下的应用，可能退出正在运行的应用）。**没有用户明确授权时不要执行**；执行时必须带 `--yes`，或由用户在配置中设置 `agent.allowUpdates: true`。
 - 替换应用时 Xup 会先下载校验，再确认进程未运行后替换，必要时弹出管理员授权；`--wait` 返回完整日志，失败原因在 `failed` 与 `log` 中。
 - `config set` 只能写 schema 允许的字段；`$schema`、`version` 由 Xup 维护。
-- 默认不要改 `check.autoUpdate`、`agent.allowUpdates` 这类放宽安全边界的开关，除非用户要求。
+- 默认不要改 `check.defaultPolicy`、`policies` 里的 `auto` / `autoDownload`、`agent.allowUpdates` 这类放宽安全边界的设置，除非用户要求；`xup stage` 只下载不替换，是安全的。
 - 只检查而不更新是安全的：`xup check --wait --json` 只读网络，不改本机。

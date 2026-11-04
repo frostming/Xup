@@ -14,7 +14,9 @@ macOS 菜单栏常驻的统一更新器。只检查、只更新你**关注**（�
 
 手动来源支持：GitHub Releases（owner/repo，可选资源名通配）、Tauri 更新 JSON、electron-updater `latest-mac.yml`、Sparkle appcast。
 
-其它：定时检查（间隔可配，默认 6 小时）、发现更新发系统通知、可选自动更新、开机启动、纯菜单栏应用（不占 Dock）。
+其它：定时检查（间隔可配，默认 6 小时）、发现更新发系统通知、开机启动、纯菜单栏应用（不占 Dock）、**更新历史**（每次更新的成功/失败、版本、耗时、触发方式，侧栏"记录 › 更新历史"，`xup history`）。
+
+**更新方式（每条目）**：每个被关注的条目单独选 `手动更新`（默认）/ `空闲时自动更新`（定时检查发现新版本后等无键鼠输入 N 分钟或锁屏再自动执行）/ 仅应用的 `自动下载，手动重启`（立即后台下载校验并暂存到 `~/Library/Caches/dev.fming.xup/staged/`，列表显示蓝色"已下载 1.5.0 · 待安装"，点"安装并重启"才替换；可选子开关"空闲且应用未运行时自动安装"）。全局只保留"新关注条目的默认更新方式"与"空闲判定"阈值；表格右键"更新方式"、应用配置 Sheet、设置 › 软件 行尾标签、`xup policy` 都可改。
 
 ## 构建与安装
 
@@ -30,10 +32,10 @@ make install    # 拷贝到 /Applications
 
 ## 目录
 
-- `Sources/Xup/Core/` — 模型、Shell 执行器（登录 shell PATH 探测）、UpdateCenter（并发检查 / 按来源串行更新）、Settings（门面）、ConfigStore（config.json 加载/校验/热加载）、ControlServer（Unix socket 控制通道）、Scheduler、日志文件
+- `Sources/Xup/Core/` — 模型、Shell 执行器（登录 shell PATH 探测）、UpdateCenter（并发检查 / 按来源串行更新 / 预下载暂存）、Settings（门面，含每条目更新方式）、ConfigStore（config.json 加载/校验/热加载/迁移）、ControlServer（Unix socket 控制通道）、Scheduler（定时检查 + 空闲自动更新调度）、IdleMonitor（空闲判定）、日志文件
 - `Sources/xup-cli/` — 独立的 `xup` 命令行（不链接 App 代码）
 - `Support/` — Info.plist、`config.schema.json`、面向 agent 的 `SKILL.md`
-- `Sources/Xup/Providers/` — 各来源实现；`Sparkle.swift` 含 appcast 解析与 AppInstaller；`AppSources.swift` 含 electron / GitHub / Tauri / appcast 的版本与下载地址解析
+- `Sources/Xup/Providers/` — 各来源实现；`Sparkle.swift` 含 appcast 解析与 AppInstaller（`prepare` 暂存 / `apply` 替换）；`Staging.swift` 为持久暂存目录与元数据校验；`AppSources.swift` 含 electron / GitHub / Tauri / appcast 的版本与下载地址解析
 - `Sources/Xup/UI/` — 主窗口、菜单栏面板、设置、选择软件 Sheet、应用来源配置 Sheet
 - `design/` — 设计规范 `DESIGN.md` 与 HTML 原型；`ACCEPTANCE.md`、`DECISIONS.md` 为验收与决策记录
 
@@ -53,8 +55,12 @@ xup apps add /Applications/Kaze.app --source "github:owner/kaze#*arm64*.dmg"
 xup apps probe-source /Applications/Kaze.app "github:owner/kaze" --json
 xup status --json                         # 上次检查、各来源可更新数、条目摘要
 xup check --kind uv --wait --json         # 触发检查并等待结果
-xup update uv:nox --wait --yes --json     # 更新需 --yes（或 config agent.allowUpdates=true）
+xup update uv:nox --wait --yes --json     # 更新需 --yes（或 config agent.allowUpdates=true）；staged 的应用直接安装
+xup policy set uv:nox auto                # 更新方式：manual / auto / auto-download（仅应用，可加 --install-when-idle on）
+xup policy list --json                    # 每条目的生效策略与默认值
+xup stage app:/Applications/IINA.app --wait  # 预下载暂存，不替换、不退出应用
 xup log --tail 50 --errors
+xup history --tail 20 --failed --json     # 更新历史（时间、from→to、结果、触发方式）；xup history clear --yes 清空
 xup skill install                         # 安装 SKILL.md 到 ~/.agents/skills/xup 与 ~/.claude/skills/xup
 ```
 
@@ -63,5 +69,7 @@ xup skill install                         # 安装 SKILL.md 到 ~/.agents/skills
 ## 排查
 
 - 日志：`~/Library/Logs/Xup/xup.log`（界面日志面板的持久化副本）
-- 配置：`~/Library/Application Support/Xup/config.json`（schema 同目录；`xup config validate` 可校验）；UserDefaults 域 `dev.fming.xup` 只剩 `lastCheckedAt`、`hasSeenWatchPicker` 与窗口状态
-- 调试环境变量：`XUP_DEBUG_OPEN_WINDOW=1` 启动即开主窗口；`XUP_DEBUG_UPDATE=<id,...>` 首次检查后自动更新指定条目（id 形如 `uv:nox`、`homebrew:formula/act`、`app:/Applications/IINA.app`）
+- 更新历史：`~/Library/Application Support/Xup/history.jsonl`（每行一条 JSON，最多保留 2000 条；主窗口"更新历史"与 `xup history` 读取同一文件）
+- 配置：`~/Library/Application Support/Xup/config.json`（schema 同目录；`xup config validate` 可校验）；UserDefaults 域 `dev.fming.xup` 只剩 `lastCheckedAt`、`hasSeenWatchPicker` 与窗口状态。旧字段 `check.autoUpdate` 会在首次加载时迁移为 `check.defaultPolicy` + `policies`
+- 暂存的应用新版本：`~/Library/Caches/dev.fming.xup/staged/<bundleID>/<version>/`（设置 › 通用 可一键清除）
+- 调试环境变量：`XUP_DEBUG_OPEN_WINDOW=1` 启动即开主窗口；`XUP_DEBUG_SIDEBAR=<kind|history>` 指定启动时的分区；`XUP_DEBUG_UPDATE=<id,...>` 首次检查后自动更新指定条目（id 形如 `uv:nox`、`homebrew:formula/act`、`app:/Applications/IINA.app`）

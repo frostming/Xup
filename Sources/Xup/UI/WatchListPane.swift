@@ -203,6 +203,19 @@ struct WatchListPane: View {
                 }
             }
             Spacer(minLength: 8)
+            // §19.3 (3)：已关注行显示策略小标签（含"手动"），点击弹出菜单修改。
+            if on {
+                let target = PolicyTarget(kind: segment, name: entry.name, detail: entry.detail)
+                Menu {
+                    PolicyMenuItems(targets: [target])
+                } label: {
+                    PolicyTag(policy: settings.policy(for: target.id))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("更新方式：点击修改")
+            }
             Text(entry.version)
                 .font(.callout).monospacedDigit().foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -211,6 +224,11 @@ struct WatchListPane: View {
         .frame(height: 36)
         .contentShape(Rectangle())
         .onTapGesture { set(entry.name, !on) }
+        .contextMenu {
+            if on {
+                Menu("更新方式") { PolicyMenuItems(targets: [PolicyTarget(kind: segment, name: entry.name, detail: entry.detail)]) }
+            }
+        }
     }
 
     private func smallEmpty(symbol: String, title: String, description: String?, button: String,

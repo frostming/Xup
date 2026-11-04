@@ -3,21 +3,29 @@ import Foundation
 @MainActor
 final class AppModel: ObservableObject {
     let settings: AppSettings
+    let history: UpdateHistory
     let center: UpdateCenter
     let scheduler: Scheduler
     let control: ControlServer
 
     init() {
         let settings = AppSettings()
-        let center = UpdateCenter(settings: settings)
+        let history = UpdateHistory()
+        let center = UpdateCenter(settings: settings, history: history)
         self.settings = settings
+        self.history = history
         self.center = center
-        self.scheduler = Scheduler(settings: settings, center: center)
-        self.control = ControlServer(handler: ControlCommands.makeHandler(center: center, settings: settings))
+        let scheduler = Scheduler(settings: settings, center: center)
+        self.scheduler = scheduler
+        self.control = ControlServer(handler: ControlCommands.makeHandler(center: center, settings: settings, scheduler: scheduler))
 
         // config.json 的日志（含启动期缓存的迁移/加载消息）进入界面日志与 xup.log。
         settings.store.log = { [weak center] text, isError in
             center?.appendLog(source: "配置", text: text, isError: isError)
+        }
+        // §19.7 策略降级等提示。
+        settings.log = { [weak center] text in
+            center?.appendLog(source: "Xup", text: text)
         }
         // electron.deltaDownload / keepVersionsPerApp → Providers/BlockmapDelta.swift 的 DeltaDownloadPolicy。
         settings.store.onElectronSettings = { enabled, keep in
@@ -28,6 +36,8 @@ final class AppModel: ObservableObject {
         // 只改间隔、通知等开关不触发检查。
         settings.onExternalChange = { [weak center] old, new, source in
             guard let center, source == .external else { return }
+            // 策略变化（CLI `xup policy set`）：不再是 autoDownload 的应用清理暂存。
+            if old.policies != new.policies || old.apps != new.apps { center.reconcileStaging() }
             guard old.tracked != new.tracked || old.apps != new.apps || old.homebrew != new.homebrew else { return }
             Task { @MainActor in
                 await center.waitUntilIdle()
@@ -54,7 +64,7 @@ final class AppModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 500_000_000)
             }
             center.appendLog(source: "Debug", text: "XUP_DEBUG_UPDATE → 更新 \(ids.sorted().joined(separator: ", "))")
-            await center.update(ids: ids)
+            await center.update(ids: ids, trigger: .auto)
         }
     }
 }

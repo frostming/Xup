@@ -56,13 +56,14 @@ enum ConfigFile {
         [
             "$schema": "./config.schema.json",
             "version": 1,
-            "check": ["intervalMinutes": 360, "notify": true, "autoUpdate": false],
+            "check": ["intervalMinutes": 360, "notify": true, "defaultPolicy": "manual", "idleMinutes": 5],
             "homebrew": ["greedy": false],
             "ui": ["showUpToDate": false, "launchAtLogin": false],
             "electron": ["deltaDownload": true, "keepVersionsPerApp": 1],
             "agent": ["allowUpdates": false],
             "tracked": Dictionary(uniqueKeysWithValues: kinds.map { ($0, [String]()) }),
             "apps": [[String: Any]](),
+            "policies": [String: Any](),
         ]
     }
 

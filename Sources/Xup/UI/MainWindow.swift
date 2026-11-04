@@ -3,6 +3,7 @@ import SwiftUI
 
 /// §2 主窗口：NavigationSplitView 侧栏 + 内容。
 struct MainWindow: View {
+    @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var ui: UIState
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.dismissWindow) private var dismissWindow
@@ -25,6 +26,11 @@ struct MainWindow: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { XupActions.activate(); debugOpenSettings() }
             }
             NSLog("[Xup] MainWindow appeared, requested=\(ui.mainWindowRequested)")
+            // 调试：`XUP_DEBUG_SOURCE_SHEET=/Applications/Foo.app` 启动后打开该应用的配置 Sheet。
+            if let p = ProcessInfo.processInfo.environment["XUP_DEBUG_SOURCE_SHEET"], let app = settings.managedApps.first(where: { $0.path == p }) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { ui.presentSourceSheet(for: app) }
+            }
+            DebugHooks.presentPanelPreviewIfRequested(model: model, ui: ui)
             // 纯菜单栏应用：macOS 14 上随启动自动打开的主窗口若非明确请求（非首次启动），立即关闭。
             if !ui.mainWindowRequested && !ui.openMainWindowOnLaunch {
                 dismissWindow(id: XupActions.mainWindowID)
@@ -41,7 +47,13 @@ struct MainWindow: View {
 
 struct SidebarView: View {
     @EnvironmentObject private var center: UpdateCenter
+    @EnvironmentObject private var history: UpdateHistory
     @EnvironmentObject private var ui: UIState
+
+    /// §18 角标：最近 24 小时失败数，红色；0 不显示。
+    private var recentFailures: Int {
+        UpdateHistory.failedCount(history.records, since: Date().addingTimeInterval(-24 * 3600))
+    }
 
     var body: some View {
         List(selection: $ui.sidebar) {
@@ -52,6 +64,12 @@ struct SidebarView: View {
                 ForEach(ProviderKind.sidebarOrder) { kind in
                     sidebarRow(kind).tag(SidebarItem.kind(kind))
                 }
+            }
+            Section("记录") {
+                Label("更新历史", systemImage: "clock.arrow.circlepath")
+                    .badge(recentFailures > 0 ? Text("\(recentFailures)").foregroundStyle(.red) : nil)
+                    .help(recentFailures > 0 ? "最近 24 小时有 \(recentFailures) 次更新失败" : "每次更新的成功 / 失败记录")
+                    .tag(SidebarItem.history)
             }
         }
         .listStyle(.sidebar)
@@ -87,6 +105,7 @@ struct SidebarView: View {
 
 struct DetailView: View {
     @EnvironmentObject private var center: UpdateCenter
+    @EnvironmentObject private var history: UpdateHistory
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var ui: UIState
     @Environment(\.openSettings) private var openSettings
@@ -121,13 +140,46 @@ struct DetailView: View {
     private var isUpdating: Bool { !center.updatingIDs.isEmpty || ui.batch != nil }
     private var busy: Bool { center.isChecking || isUpdating }
 
+    private var isHistory: Bool { ui.sidebar == .history }
+
     private var subtitle: String {
-        let n = actionableInView.count
+        if isHistory {
+            let n = history.records.count
+            return n > 0 ? "更新历史 · \(n) 条" : "更新历史"
+        }
+        let staged = baseItems.filter { $0.status.isStaged }.count
+        let n = actionableInView.count - staged
         let name = ui.sidebar?.title ?? "全部"
-        return n > 0 ? "\(name) · \(n) 个可更新" : name
+        var parts = [name]
+        if staged > 0 { parts.append("\(staged) 个待安装") }
+        if n > 0 { parts.append("\(n) 个可更新") }
+        return parts.joined(separator: " · ")
     }
 
     var body: some View {
+        Group {
+            if isHistory {
+                HistoryView()
+            } else {
+                listAndLog
+            }
+        }
+        .navigationTitle("Xup")
+        .navigationSubtitle(subtitle)
+        .searchable(text: $ui.search, placement: .toolbar, prompt: isHistory ? "搜索名称或错误信息" : "搜索名称或来源")
+        .toolbar { if isHistory { historyToolbar } else { toolbar } }
+        .background(shortcutButtons)
+        .onChange(of: center.isChecking) { _, checking in if checking { ui.showLog = true } }
+        .onChange(of: center.updatingIDs.isEmpty) { _, empty in if !empty { ui.showLog = true } }
+        .onChange(of: ui.sidebar) { _, _ in ui.selection = [] }
+        .alert(item: $pendingConfirm) { p in
+            Alert(title: Text("确认更新"), message: Text(p.message),
+                  primaryButton: .default(Text(p.button)) { ui.update(ids: p.ids, center: center) },
+                  secondaryButton: .cancel(Text("取消")))
+        }
+    }
+
+    private var listAndLog: some View {
         VSplitView {
             VStack(spacing: 0) {
                 content.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -138,19 +190,6 @@ struct DetailView: View {
                 LogPanel()
                     .frame(minHeight: 72, idealHeight: 160)
             }
-        }
-        .navigationTitle("Xup")
-        .navigationSubtitle(subtitle)
-        .searchable(text: $ui.search, placement: .toolbar, prompt: "搜索名称或来源")
-        .toolbar { toolbar }
-        .background(shortcutButtons)
-        .onChange(of: center.isChecking) { _, checking in if checking { ui.showLog = true } }
-        .onChange(of: center.updatingIDs.isEmpty) { _, empty in if !empty { ui.showLog = true } }
-        .onChange(of: ui.sidebar) { _, _ in ui.selection = [] }
-        .alert(item: $pendingConfirm) { p in
-            Alert(title: Text("确认更新"), message: Text(p.message),
-                  primaryButton: .default(Text(p.button)) { ui.update(ids: p.ids, center: center) },
-                  secondaryButton: .cancel(Text("取消")))
         }
     }
 
@@ -248,7 +287,23 @@ struct DetailView: View {
         }
     }
 
-    /// 不占空间的快捷键载体：⌘1…8 切换分区。
+    /// §18 更新历史分区的工具栏：筛选 + 清空历史（搜索框由 `.searchable` 复用）。
+    @ToolbarContentBuilder private var historyToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Picker("筛选", selection: $ui.historyFailedOnly) {
+                Label("全部", systemImage: "line.3.horizontal.decrease.circle").tag(false)
+                Label("仅失败", systemImage: "exclamationmark.triangle").tag(true)
+            }
+            .pickerStyle(.menu)
+            .help("筛选：全部 / 仅失败")
+
+            Button { ui.historyClearRequested = true } label: { Label("清空历史", systemImage: "trash") }
+                .help("删除全部更新记录")
+                .disabled(history.records.isEmpty)
+        }
+    }
+
+    /// 不占空间的快捷键载体：⌘1…8 切换分区，⌘9 更新历史。
     private var shortcutButtons: some View {
         Group {
             Button("") { ui.sidebar = .all }.keyboardShortcut("1", modifiers: .command)
@@ -256,6 +311,7 @@ struct DetailView: View {
                 Button("") { ui.sidebar = .kind(k) }
                     .keyboardShortcut(KeyEquivalent(Character("\(i + 2)")), modifiers: .command)
             }
+            Button("") { ui.sidebar = .history }.keyboardShortcut("9", modifiers: .command)
         }
         .frame(width: 0, height: 0)
         .opacity(0)
@@ -327,6 +383,8 @@ struct StatusBarView: View {
     private var stats: String {
         if let kind, kind != .app, center.untrackedKinds.contains(kind) { return "未跟踪任何 \(kind.installedNoun)" }
         var parts = ["共 \(scoped.count) 项"]
+        let staged = scoped.filter { $0.status.isStaged }.count
+        if staged > 0 { parts.append("\(staged) 个待安装") }
         let outdated = scoped.filter { $0.status.isOutdated }.count
         if outdated > 0 { parts.append("\(outdated) 个可更新") }
         let failed = scoped.filter(\.isFailed).count
@@ -368,6 +426,11 @@ struct StatusBarView: View {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
                 Text("正在自动更新 \(center.items.first { center.updatingIDs.contains($0.id) }?.name ?? "")")
+            }
+        } else if !center.stagingIDs.isEmpty {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("后台下载 \(center.items.filter { center.stagingIDs.contains($0.id) }.map(\.name).joined(separator: "、"))…")
             }
         } else if let c = ui.completion {
             Text(c.text).foregroundStyle(c.failed ? .red : .secondary)

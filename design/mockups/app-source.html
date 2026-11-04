@@ -2,7 +2,7 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><title>Xup · 应用更新来源</title><link rel="stylesheet" href="mac.css">
 <style>.sec-title{color:#fff;font-size:15px;font-weight:600;margin:40px 0 14px;text-shadow:0 1px 2px rgba(0,0,0,.3)}.cap{color:#fff;font-size:12px;font-weight:600;margin:0 0 8px;opacity:.9}.grid>div{max-width:440px}</style></head>
 <body>
-<div class="nav"><b>Xup 原型</b><a href="main.html">主窗口</a><a href="menubar.html">菜单栏</a><a href="settings.html">设置</a><a href="states.html">状态</a><a href="picker.html">选择软件</a><a class="on" href="app-source.html">应用来源</a><span class="sp"></span><button id="theme">切换到深色</button></div>
+<div class="nav"><b>Xup 原型</b><a href="main.html">主窗口</a><a href="menubar.html">菜单栏</a><a href="settings.html">设置</a><a href="states.html">状态</a><a href="picker.html">选择软件</a><a class="on" href="app-source.html">应用来源</a><a href="policy.html">更新方式</a><span class="sp"></span><button id="theme">切换到深色</button></div>
 
 <h1 class="page">应用更新来源 — 自动识别与手动配置（DESIGN.md §16）</h1>
 <p class="lead">自动识别新增 electron-updater（读 <code>Contents/Resources/app-update.yml</code>）；识别不了的应用可以右键"配置更新来源…"手动指定 GitHub Releases / Tauri 更新 JSON / electron-updater latest-mac.yml / Sparkle appcast；既识别不了也没配置的应用，状态改为灰色"由应用自更新"，操作列提供"启动应用"。</p>

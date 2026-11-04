@@ -35,11 +35,18 @@ struct SettingsView: View {
 
 struct GeneralSettings: View {
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var center: UpdateCenter
     @EnvironmentObject private var ui: UIState
     @Environment(\.openWindow) private var openWindow
+    @State private var stagedSize: Int64 = 0
 
     private var trackedCount: Int {
         settings.tracked.values.reduce(0) { $0 + $1.count } + settings.managedApps.count
+    }
+
+    /// 默认策略为手动且没有任何条目是自动时，空闲判定行置灰（仍可改）。
+    private var idleRowDimmed: Bool {
+        settings.defaultPolicy == .manual && !settings.config.policies.values.contains { $0 != .manual }
     }
 
     private enum Interval: Hashable {
@@ -96,12 +103,42 @@ struct GeneralSettings: View {
                     }
                 }
                 Toggle("发现更新时通知", isOn: $settings.notifyOnUpdates)
-                Toggle("发现更新时自动更新", isOn: $settings.autoUpdate)
-                Text("关闭时，定时检查只会通知你；开启后发现更新会直接执行，应用分区仍遵循每个应用的“运行中处理方式”。")
+
+                // §19.5 两项：新关注条目的默认更新方式 + 空闲判定。
+                Picker("新关注条目的默认更新方式", selection: $settings.defaultPolicy) {
+                    Text(UpdatePolicy.manual.title).tag(UpdatePolicy.manual)
+                    Text(UpdatePolicy.auto.title).tag(UpdatePolicy.auto)
+                }
+                .pickerStyle(.menu)
+                Text("只影响之后新关注的条目；已有条目保留各自的更新方式，可在列表右键“更新方式”中逐条修改。")
                     .font(.footnote).foregroundStyle(.secondary)
-                if settings.autoUpdate {
-                    Label("自动更新可能在你使用某个应用时将其退出。", systemImage: "exclamationmark.triangle")
-                        .font(.footnote).foregroundStyle(.secondary)
+
+                HStack {
+                    Text("空闲判定")
+                    Spacer()
+                    Text("无操作")
+                    TextField("", value: $settings.idleMinutes, format: .number)
+                        .frame(width: 44)
+                        .multilineTextAlignment(.trailing)
+                        .labelsHidden()
+                    Stepper("", value: $settings.idleMinutes, in: 1...60).labelsHidden()
+                    Text("分钟后视为空闲")
+                }
+                .foregroundStyle(idleRowDimmed ? .secondary : .primary)
+                Text("“空闲时自动更新”的条目会等到这么久没有键盘鼠标输入后才开始更新；锁屏与屏幕保护视为空闲。")
+                    .font(.footnote).foregroundStyle(.secondary)
+
+                if center.stagedCount > 0 {
+                    LabeledContent("已下载待安装的更新") {
+                        HStack(spacing: 8) {
+                            Text("\(center.stagedCount) 项 · \(ByteCountFormatter.string(fromByteCount: stagedSize, countStyle: .file))")
+                                .foregroundStyle(.secondary)
+                            Button("清除") { center.clearAllStaged(); stagedSize = 0 }
+                                .controlSize(.small)
+                                .help("删除已下载暂存的安装包；下次定时检查会重新下载")
+                        }
+                    }
+                    .onAppear { stagedSize = StagingStore.totalSize() }
                 }
             }
 
@@ -314,13 +351,14 @@ struct AppsSettings: View {
             sourceTag(app: app, item: item)
                 .lineLimit(1)
                 .fixedSize()
-            // §17：运行时策略只读简述；修改在"配置应用…"Sheet 里。
+            // §17 / §19.3：更新方式 + 运行时策略 只读简述，如"空闲自动 · 运行中自动重开"；修改在"配置应用…"Sheet 里。
             if !selfUpdating {
-                let policy = AppRunningPolicy(restartAfterUpdate: app.restartAfterUpdate)
-                Text(policy.shortTag)
+                let running = AppRunningPolicy(restartAfterUpdate: app.restartAfterUpdate)
+                let update = item.map { settings.policy(for: $0) } ?? settings.policy(for: app.itemID)
+                Text("\(update.shortTag) · \(running.shortTag)")
                     .font(.caption).foregroundStyle(.secondary)
                     .lineLimit(1).fixedSize()
-                    .help("应用正在运行时：" + policy.tooltip)
+                    .help("更新方式：\(update.title)" + (update == .autoDownload && app.installWhenIdle ? "（空闲且未运行时自动安装）" : "") + "；应用正在运行时：" + running.tooltip)
             }
             Button { sourceSheetApp = app } label: {
                 Image(systemName: "chevron.right").foregroundStyle(.tertiary)

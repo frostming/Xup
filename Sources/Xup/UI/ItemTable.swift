@@ -50,14 +50,14 @@ struct ItemTable: View {
             .width(96)
 
             TableColumn("状态", value: \.statusRank) { item in
-                StatusBadge(item: withRunningPolicyHint(item))
+                StatusBadge(item: withRunningPolicyHint(item), isStaging: center.stagingIDs.contains(item.id))
             }
             .width(150)
 
             TableColumn("操作") { item in
                 actionCell(item)
             }
-            .width(84)
+            .width(96)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .contextMenu(forSelectionType: String.self) { ids in
@@ -96,7 +96,14 @@ struct ItemTable: View {
                     .help(item.kind.title)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.name).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(item.name).lineLimit(1)
+                    // §19.6：只在策略 ≠ 手动时显示，默认态保持安静。
+                    let policy = settings.policy(for: item)
+                    if policy != .manual, item.canUpdate {
+                        PolicyTag(policy: policy, installWhenIdle: item.appPath.map { settings.installWhenIdle(path: $0) } ?? false)
+                    }
+                }
                 Text(item.detail ?? " ")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -111,6 +118,14 @@ struct ItemTable: View {
     @ViewBuilder private func actionCell(_ item: UpdateItem) -> some View {
         HStack(spacing: 6) {
             switch item.status {
+            case .staged:
+                // §19.4 常显的主操作；应用未运行时文字为"安装"。
+                let running = item.appPath.map { AppRunningPolicy.isRunning(appPath: $0) } ?? false
+                Button(running ? "安装并重启" : "安装") { onUpdate([item.id]) }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(center.isChecking || !center.updatingIDs.isEmpty)
+                    .help(running ? "退出 \(item.name)，替换为已下载的新版本并重新打开" : "替换为已下载的新版本")
             case .outdated where item.canUpdate:
                 Button("更新") { onUpdate([item.id]) }
                     .buttonStyle(.bordered)
@@ -162,11 +177,15 @@ struct ItemTable: View {
     }
 
     /// §17：策略为"等我关闭后再更新"、应用正在运行且有新版本时，状态列补一句提示。
+    /// §19：策略为"空闲时自动更新"的可更新条目提示"将在空闲时自动更新"。
     private func withRunningPolicyHint(_ item: UpdateItem) -> UpdateItem {
-        guard item.status.isOutdated, item.canUpdate, runningPolicy(for: item) == .waitForQuit,
-              let path = item.appPath, AppRunningPolicy.isRunning(appPath: path) else { return item }
+        guard item.status.isOutdated, item.canUpdate else { return item }
         var copy = item
-        copy.hint = AppRunningPolicy.skippedWhileRunningHint
+        if runningPolicy(for: item) == .waitForQuit, let path = item.appPath, AppRunningPolicy.isRunning(appPath: path) {
+            copy.hint = AppRunningPolicy.skippedWhileRunningHint
+        } else if copy.hint == nil, settings.policy(for: item) == .auto {
+            copy.hint = "将在空闲时自动更新"
+        }
         return copy
     }
 
@@ -181,13 +200,24 @@ struct ItemTable: View {
     @ViewBuilder private func contextMenu(_ ids: Set<String>) -> some View {
         let selected = items.filter { ids.contains($0.id) }
         let updatable = selected.filter { $0.canUpdate && ($0.isActionable || $0.isFailed) }
-        Button("更新") { onUpdate(Set(updatable.map(\.id))) }
+        let stagedSelected = selected.filter { $0.status.isStaged }
+        Button(stagedSelected.count == selected.count && !selected.isEmpty ? "安装并重启" : "更新") { onUpdate(Set(updatable.map(\.id))) }
             .disabled(updatable.isEmpty || !center.updatingIDs.isEmpty)
-        if selected.count == 1, let single = selected.first, let app = managedApp(for: single) {
-            // §16.3 / §16.4 / §17：应用行的"启动应用"（仅自更新行）与"配置应用…"（运行时策略 + 更新来源）。
-            if single.isSelfUpdating {
-                Button { Task { await center.launch(app) } } label: { Label("启动应用", systemImage: "play.circle") }
+        if selected.count == 1, let single = selected.first, let app = managedApp(for: single), single.isSelfUpdating {
+            // §16.4：自更新行的"启动应用"。
+            Button { Task { await center.launch(app) } } label: { Label("启动应用", systemImage: "play.circle") }
+        }
+        // §19.3 更新方式子菜单（多选批量；不一致不勾）。
+        if !selected.isEmpty {
+            Menu {
+                PolicyMenuItems(targets: selected.map(PolicyTarget.init(item:)))
+            } label: {
+                Label("更新方式", systemImage: "clock.arrow.circlepath")
             }
+            .disabled(selected.allSatisfy { !$0.canUpdate })
+        }
+        if selected.count == 1, let single = selected.first, let app = managedApp(for: single) {
+            // §16.3 / §17：应用行的"配置应用…"（更新方式 + 运行时策略 + 更新来源）。
             Button { ui.presentSourceSheet(for: app) } label: { Label("配置应用…", systemImage: "slider.horizontal.3") }
         }
         if selected.count == 1, let path = selected.first?.filePath {

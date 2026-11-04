@@ -117,7 +117,7 @@ Xup (MenuBarExtra, .window 样式)
 | 状态 | 160 | 状态徽标 §3 + message/hint |
 | 操作 | 84 | 悬停或选中时显示：`更新` 按钮（`.buttonStyle(.bordered)` `.controlSize(.small)`），不可更新时为灰色 `信息` 图标 `info.circle`（点击显示 Popover 说明 hint）。应用分区额外有"更新后重启"Toggle（`.toggleStyle(.switch)` `.controlSize(.mini)`） |
 
-- 表头可点击排序：默认按状态（可更新 → 失败 → 未知 → 更新中 → 最新）再按名称。
+- 表头可点击排序：默认按状态（**待安装** → 可更新 → 失败 → 未知 → 更新中 → 已更新 → 最新）再按名称（§19.4）。
 - 列表排序可切换，但**可更新项永远在"最新"项之前**（除非用户显式按名称排序）。
 - "显示已是最新的条目"关闭时（设置项），`.upToDate` 行隐藏，状态栏仍统计。
 - 右键菜单（`contextMenu`）：更新 / 在 Finder 中显示（应用、Agent 的二进制路径；Skills 为 `~/.agents/skills/<name>`）/ 复制名称 / 复制版本 / **取消关注**（`eye.slash`，非应用分区；从关注集合移除并立即从列表消失，支持 ⌘Z）/ （应用）移除。"取消关注"与"移除"语义等价，只是应用分区沿用旧文案。
@@ -158,8 +158,9 @@ Xup (MenuBarExtra, .window 样式)
 | `.updating` | `ProgressView().controlSize(.mini)` | `Color.accentColor` | 更新中 | 行背景加 `Color.accentColor.opacity(0.06)` |
 | `.updated` | `checkmark.seal.fill` | `Color.green` | 已更新 | 下次检查后自然变为"最新"；与"最新"区分 symbol 以便用户看到这轮成果 |
 | `.failed(msg)` | `xmark.circle.fill` | `Color.red` | 失败 · msg | 行末出现"重试"按钮（`arrow.counterclockwise`）与"查看日志"（跳到日志中对应行） |
+| `.staged(version)` **（§19 新增）** | `arrow.down.circle.fill` | `Color.blue` | 已下载 1.5.0 · 待安装 | 仅应用、策略为"自动下载，手动重启"时出现：新版本已在后台下载并校验完成，等用户点"安装并重启"。蓝色 = "已为你准备好，一键即可"；与橙色"可更新"区分，避免用户以为还要等下载 |
 
-角标/计数一律只统计 `isActionable` 的条目（即 `canUpdate && outdated`）。
+角标/计数一律只统计 `isActionable` 的条目（即 `canUpdate && (outdated || staged)`）。"待安装"计入角标与"全部更新"。
 
 ---
 
@@ -282,7 +283,8 @@ Xup (MenuBarExtra, .window 样式)
 **Section「检查」**
 - `Picker("检查间隔")`：15 分钟 / 1 小时 / 6 小时 / 12 小时 / 每天 / 自定义…；选"自定义"后出现 `Stepper` + `TextField` "每 __ 分钟"（最小 5）。
 - `Toggle("发现更新时通知")`
-- `Toggle("发现更新时自动更新")` **默认关闭**：定时检查默认只发通知，不执行更新。脚注：`关闭时，定时检查只会通知你；开启后发现更新会直接执行，应用分区仍遵循"更新后重启"开关。` 开启时展示 ⚠︎ 行 `.foregroundStyle(.secondary)`："自动更新可能在你使用某个应用时将其退出。"
+- ~~`Toggle("发现更新时自动更新")`~~ → **已改为（§19.5）**：`Picker("新关注条目的默认更新方式")`，两项 **手动更新** / **空闲时自动更新**，默认"手动更新"。脚注：`只影响之后新关注的条目；已有条目保留各自的更新方式，可在列表右键"更新方式"中逐条修改。`
+- `Stepper("空闲判定")`：`无操作 __ 分钟后视为空闲`，范围 1–60，默认 **5**。脚注：`"空闲时自动更新"的条目会等到这么久没有键盘鼠标输入后才开始更新。锁屏与屏幕保护视为空闲。`
 
 **Section「Homebrew」**
 - `Toggle("包含自动更新的 cask (--greedy)")` 脚注：`检查会把自带更新机制的应用（如 Chrome）也列为可更新。`
@@ -332,7 +334,7 @@ Xup (MenuBarExtra, .window 样式)
 
 **来源（ProviderKind.symbol）**：Homebrew `mug` · npm 全局 `shippingbox` · uv tool `bolt` · Agents `cpu` · **Skills `sparkles`** · **插件 `puzzlepiece.extension`** · 应用 `macwindow` · 全部 `square.grid.2x2`
 
-**状态**：可更新 `arrow.up.circle.fill` · 不可更新的可更新 `arrow.up.circle` / pinned `pin.fill` · 最新 `checkmark.circle.fill` · 已更新 `checkmark.seal.fill` · 失败 `xmark.circle.fill` · 未知 `questionmark.circle` · 警告 `exclamationmark.triangle.fill` · 由 claude.ai 同步（只读）`icloud` · **由应用自更新（只读）`arrow.triangle.2.circlepath`**（与菜单栏"工作中"图标同名但语境不同：前者灰色静态在状态列，后者在状态栏图标，不会同屏混淆）
+**状态**：可更新 `arrow.up.circle.fill` · **已下载，待安装 `arrow.down.circle.fill`（蓝，§19）** · 不可更新的可更新 `arrow.up.circle` / pinned `pin.fill` · 最新 `checkmark.circle.fill` · 已更新 `checkmark.seal.fill` · 失败 `xmark.circle.fill` · 未知 `questionmark.circle` · 警告 `exclamationmark.triangle.fill` · 由 claude.ai 同步（只读）`icloud` · **由应用自更新（只读）`arrow.triangle.2.circlepath`**（与菜单栏"工作中"图标同名但语境不同：前者灰色静态在状态列，后者在状态栏图标，不会同屏混淆）
 
 **操作**：检查更新 `arrow.clockwise` · 更新选中 `arrow.down.circle` · 全部更新 `arrow.down.to.line` · 停止 `stop.circle` · 重试 `arrow.counterclockwise` · 添加 `plus` · **选择软件… `checklist`** · **取消关注 `eye.slash`** · 清除搜索 `xmark.circle` · 移除 `minus` / `trash` · 日志 `terminal` · 复制 `doc.on.doc` · 在 Finder 中显示 `folder` · 编辑 `square.and.pencil` · 信息 `info.circle` · 搜索 `magnifyingglass` · 跳到底部 `arrow.down.to.line.compact` · 重启 `arrow.triangle.2.circlepath` · 打开窗口 `macwindow` · 设置 `gearshape` · 退出 `power` · **启动应用 `play.fill`（行内按钮）/ `play.circle`（右键菜单）** · **配置更新来源… `slider.horizontal.3`** · **URL 字段前缀 `link`** · **设置行进入 `chevron.right`** · **测试结果 `checkmark.circle.fill` / `xmark.circle.fill` / 未测试 `info.circle`**
 
@@ -343,6 +345,8 @@ Xup (MenuBarExtra, .window 样式)
 **设置 Tab**：`gearshape` · `cpu` · `macwindow`
 
 **来源标签（设置 › 应用，§16.5）**：自定义 `slider.horizontal.3` · 自更新 `arrow.triangle.2.circlepath`；其余标签纯文字无 symbol
+
+**更新方式（§19）**：右键子菜单入口 `clock.arrow.circlepath` · 手动更新 `hand.raised` · 空闲时自动更新 `moon.zzz` · 自动下载，手动重启 `arrow.down.circle.dotted` · 当前选中项 `checkmark` · 安装并重启 `arrow.down.circle.fill`（与状态同 symbol，按钮内不再带图标，仅文字）· 通知：自动更新完成 `checkmark.seal.fill` / 已下载待安装 `arrow.down.circle.fill` / 失败 `xmark.circle.fill`。策略小标签纯文字无 symbol
 
 ---
 
@@ -599,6 +603,7 @@ Xup (MenuBarExtra, .window 样式)
 - 右键菜单：`更新` 禁用 · **`启动应用`**（`play.circle`）· **`配置更新来源…`** · 分隔 · 在 Finder 中显示 · 复制名称 · 复制版本 · 分隔 · 移除。非自更新行也有"启动应用"（放在"更新"之后），但只有自更新行把它作为主操作放进操作列。
 - 状态栏在应用分区追加计数：`共 7 项 · 2 个可更新 · 2 个由应用自更新`。
 - 菜单栏面板不列自更新应用（它们永远没有"可更新"）。
+- 自更新行在"更新方式"子菜单中全部禁用（Xup 不替它更新，策略无意义），配置 Sheet 中「更新方式」分组同样 `.disabled`。
 - §6.5 空状态描述改为："添加 /Applications 中的应用，Xup 会自动识别它来自 Homebrew、Sparkle、electron-updater 还是 App Store；识别不了的可以手动配置来源。"
 
 ### 16.5 设置 › 应用 行的来源标签
@@ -638,3 +643,202 @@ struct ManagedApp { …; var customSource: AppUpdateSource?; var detectedSource:
   - 设置 › 应用：行尾 Toggle 换为只读简述 `运行中自动重开` / `运行中跳过`（`.caption .secondary`，自更新行不显示）；点击行或 `›` 打开同一个"应用设置"Sheet；列表下方追加一句脚注解释两种策略；§7.2"自动更新"脚注改为"应用分区仍遵循每个应用的'运行中处理方式'"。
   - 状态列：策略为"等我关闭后再更新"且应用正在运行且有新版本时，hint 显示 `应用运行中，按设置暂不更新；关闭后点"更新"，或在"配置应用…"里改为自动退出并重新打开`；AppsProvider 对应日志 / 抛错用其简短版。
   - schema `restartAfterUpdate.description`、SKILL.md、README、`xup apps add --restart/--no-restart` 帮助同步为上述两句含义。§4.2 / §7.3 / §16.4 / §16.5 中提到的"更新后重启"开关均以本节为准。
+
+---
+
+## 19. 更新方式（每条目策略，2026-11-04 新增）
+
+> 原型：`mockups/policy.html`。背景：§7.1 原有的"发现更新时自动更新"是全局一刀切——开了会在用户正用着某个应用时把它退出，关了又得每次手点。用户拍板：**每个被关注的条目单独选更新方式**，全局只保留"新关注条目的默认值"。
+
+### 19.1 策略定义与适用范围
+
+| 策略 | `UpdatePolicy` | 适用 | 行为 |
+|---|---|---|---|
+| **手动更新**（默认） | `manual` | 所有条目 | 定时检查只把条目标为"可更新"并计入角标/通知，用户点"更新"才执行。即现状 |
+| **空闲时自动更新** | `auto` | 所有条目 | 定时检查发现新版本后，等系统空闲（§19.2）再自动执行。应用条目在执行时遵循其 §17"应用正在运行时"策略：`自动退出并重新打开` → 空闲时直接退出替换重开；`等我关闭后再更新` → 应用若在运行则本轮跳过，下次复查再试 |
+| **自动下载，手动重启** | `autoDownload` | **仅应用**，且来源为 Xup 自己下载替换的类型（Sparkle / electron-updater / 手动配置的四类） | 发现新版本后立即在后台下载 → 校验 → 解压到暂存目录，**不替换、不退出应用**。行状态变为 `已下载 1.5.0 · 待安装`（§19.4），用户点"安装并重启"（或 CLI）时才 退出 → 替换 → 重开 |
+| └ 子开关 **空闲且应用未运行时自动安装** | `installWhenIdle: Bool`，默认 **关** | 仅在 `autoDownload` 下可用 | 开启后，暂存完成的包会在系统空闲（§19.2）且该应用**没有在运行**时自动完成安装；应用在运行就继续等用户点。相当于"只在不打扰我的情况下顺手装好" |
+
+不适用的组合：
+
+- Homebrew cask / App Store 应用：安装由 `brew` / `mas` 一步完成，无法预下载 → "自动下载，手动重启"选项 `.disabled`，下方说明 `该应用由 Homebrew / App Store 执行安装，不支持预下载`。
+- 自更新应用（§16.4）、claude.ai 同步插件（§14.2）、pinned formula、无更新命令的 agent：三个选项全部禁用，子菜单项灰显，Sheet 分组灰显。它们本来就 `canUpdate = false`。
+- 非应用条目的子菜单只有两项（不显示"自动下载"）。
+
+**默认值与继承**：
+
+- 新关注的条目（设置 › 软件 勾选、"添加应用…"、CLI `xup watch add`）取 `check.defaultPolicy`（§19.5），只有 `manual` / `auto` 两种可能；`autoDownload` 必须逐个应用手动选。
+- 已关注条目**各自保留**自己的策略；改全局默认不回溯。
+- 应用的策略可在 §17"应用设置"Sheet 的新分组「更新方式」里改（见 19.3）；非应用条目只能在表格右键 / 设置 › 软件 行里改。
+- 迁移：旧 `check.autoUpdate == true` → `defaultPolicy = auto` 且所有已关注条目策略补为 `auto`；`false` → `manual`。迁移后删除 `autoUpdate` 键。
+
+### 19.2 空闲判定与自动执行时机
+
+**空闲**：`CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: kCGAnyInputEventType)` ≥ `check.idleMinutes × 60`（默认 5 分钟，设置里 1–60 可调）。锁屏 / 屏幕保护中直接视为空闲；系统睡眠时不执行（定时器本身不会跑）。**后续可选**（v1 不做，先在设置脚注预留文案位）：要求接通电源；"勿扰 / 专注模式"开启时不自动更新；低电量模式不自动更新。
+
+**执行时机**（`AutoUpdateScheduler`）：
+
+1. **只由定时检查触发**。一轮定时检查结束 → 收集 `policy == auto && isActionable` 的条目作为"待自动更新集合"；同时 `policy == autoDownload` 且 `outdated` 的应用**立即**开始后台下载（下载不需要空闲，它不打扰人）。
+2. 立即判定空闲：空闲 → 马上按 §4.1 步骤 4 执行（同一来源串行、不同来源并行，与手动"全部更新"相同的通道）；不空闲 → 每 **5 分钟**复查一次。
+3. 推迟上限 = **下一个检查周期开始**。新一轮定时检查会重新生成集合（版本可能又变了），旧集合作废，不累积。检查间隔 ≤ 15 分钟时复查间隔取 `min(5, interval/2)`。
+4. **用户手动点"检查更新"（工具栏 / 面板 / ⌘R / CLI `xup check`）不触发自动更新**——用户在场，由他决定。手动检查会清掉当前待自动更新集合吗？不会：集合保持，继续等下一次空闲判定。
+5. 自动更新执行中用户回来操作：不中断（v1 无取消通道，与 §12 一致）；菜单栏图标进入"工作中"，面板显示"正在自动更新 node (1/2)"（摘要前缀"自动"二字让用户知道不是自己点的）。
+6. `installWhenIdle` 的自动安装走同一个调度器：集合中额外包含 `staged && installWhenIdle && !isRunning` 的应用；复查时若应用已启动则本轮跳过。
+7. 自动执行期间若任一条目失败 → 行 `.failed`，**不重试**，等下次定时检查重新评估；连续 3 轮失败同一条目 → 通知里追加"已连续 3 次失败，建议手动检查日志"。
+8. 日志每条自动操作前写 `[xup] 空闲 7 分钟，开始自动更新 2 项：node、typescript`，便于事后追溯"谁动了我的软件"。
+
+**通知文案**（`UNNotification`，受 §7.1"发现更新时通知"开关控制；关闭时自动更新静默进行，仅写日志）：
+
+| 时机 | 标题 | 正文 | 点击 |
+|---|---|---|---|
+| 自动更新完成（全部成功） | `已自动更新 2 项` | `node、typescript 已在你离开时更新到最新版本。` | 打开主窗口，选中"全部" |
+| 自动更新完成（有失败） | `自动更新：1 成功，1 失败` | `IINA 更新失败：校验失败，签名不匹配。点击查看日志。` | 打开主窗口并展开日志、滚到错误行 |
+| 自动更新失败（全部失败） | `自动更新失败：IINA` | `校验失败：签名不匹配。原版本未受影响。` | 同上 |
+| 已下载待安装 | `IINA 1.5.0 已下载` | `新版本已准备好。点击"安装并重启"完成更新，只需几秒。` | 打开主窗口并选中该行 |
+| `installWhenIdle` 自动安装完成 | `IINA 已更新到 1.5.0` | `已在应用未运行时自动完成安装。` | 打开主窗口并选中该行 |
+| 暂存包失效 | `IINA 的更新包需要重新下载` | `已下载的 1.5.0 校验失败，Xup 会在下次检查时重新下载。` | 打开主窗口并选中该行 |
+
+同一轮里多个"已下载待安装"合并为一条：`2 个应用已下载更新` / `IINA、Alma 已准备好，点击"安装并重启"完成更新。`
+
+### 19.3 入口与控件
+
+1. **表格右键菜单 → `更新方式` 子菜单**（`clock.arrow.circlepath`，位于"更新 / 启动应用"之后、"配置应用…"之前）。子菜单项带勾选态（`checkmark`）：`手动更新` · `空闲时自动更新` · （仅应用）`自动下载，手动重启`；应用再多一个分隔线后的 `Toggle` 项 `空闲且应用未运行时自动安装`（仅当前策略为 autoDownload 时可用）。
+   - **多选批量设置**：右键选中的多行 → 子菜单作用于全部选中项；各行策略不一致时所有项无勾（SwiftUI 用 `Picker(selection: Binding<UpdatePolicy?>)`，nil 不勾）；包含非应用时"自动下载"项禁用并 tooltip `所选条目中含非应用`。改完后状态栏闪一行 `已将 3 项设为"空闲时自动更新"`（3 秒）。
+   - 不可更新的条目（§19.1 不适用组合）：子菜单整体 `.disabled`。
+2. **"应用设置"Sheet（§17 `AppSourceSheet`）新增分组「更新方式」**，放在「应用正在运行时」**上方**（先决定"要不要自动"，再决定"运行中怎么办"）。`Picker` `.pickerStyle(.radioGroup)` 三项，每项下一句 `.caption .secondary` 说明；第三项下方缩进 20pt 的 `Toggle("空闲且应用未运行时自动安装")`，仅第三项选中时可用。不支持预下载的来源第三项 `.disabled` + 说明。Sheet 高度相应增加约 110pt（GitHub 类型约 470）。"保存"一并写入 `setPolicy` / `setInstallWhenIdle`。
+3. **设置 › 软件**（§13.7 `WatchListPane`）：每行已关注条目在版本列左侧显示**策略小标签**（19.6），点击弹出 `Menu`（同子菜单内容，两项或三项）；未关注行不显示。行右键同样弹出。
+4. **设置 › 应用**：行尾只读简述追加策略，如 `空闲自动 · 运行中自动重开`（`.caption .secondary`）；点击行进 Sheet 改。
+5. **设置 › 通用**：见 19.5。
+6. **CLI**：`xup policy set <itemID> manual|auto|autoDownload [--install-when-idle]`、`xup policy get <itemID>`；`xup update <itemID>` 对 `staged` 条目等同"安装并重启"。
+7. **菜单栏面板**：不提供改策略的入口（面板只看不配）。
+
+### 19.4 新状态"已下载，待安装"
+
+- `ItemStatus.staged(version: String)`，`canUpdate = true`，`isActionable = true`。只有 `policy == autoDownload` 的应用会进入此态。
+- **状态徽标**：`arrow.down.circle.fill` + `Color.blue`（`systemBlue`，与 accent 默认同色但语义独立：用户改了 accent 色也保持蓝），文字 `已下载 1.5.0 · 待安装`。版本列 `latest` 加粗同"可更新"。后台下载进行中（尚未 staged）时仍是橙色"可更新"，hint `· 后台下载中 62%`（v1 无百分比时为 `· 后台下载中`），不计入"更新中"。
+- **操作列**：按钮 **`安装并重启`**，`.buttonStyle(.borderedProminent)` `.controlSize(.small)`，**常显**（不像"更新"只在悬停时出现——这是用户该做的下一步）。若应用未运行，按钮文字为 `安装`（没有东西要重启）。点击 → 行进入 `.updating`，阶段文案直接从 `替换中` 开始（跳过下载/校验/解压）→ `重启中` → `.updated`。操作列宽度为此放宽到 **96**。
+- **排序**：默认排序把"待安装"排在"可更新"之前（见 §2.4）：这是最便宜的一步操作，应该最先看到。
+- **菜单栏面板**：待安装条目排在列表最前，行尾不显示版本箭头而显示小号 `安装并重启` 按钮（`.borderedProminent .mini`）；摘要行文案 `1 个待安装 · 4 个可更新`。面板"全部更新"同样会安装待安装项。
+- **暂存与失效**：暂存目录 `~/Library/Application Support/Xup/Staged/<bundleID>/<version>/`，每个应用只保留一个版本；远端出现更高版本 → 丢弃旧暂存重新下载（行短暂回到"可更新 · 后台下载中"）。安装前重新校验长度/sha512/EdDSA；校验失败或文件被删 → 回到 `可更新 · 暂存包已失效，将重新下载`（橙），发 19.2 的失效通知，下次定时检查重下。暂存超过 **30 天**未安装也视为失效（避免装一个早就过时的版本）。移除应用 / 取消关注 / 改回其他策略 → 立即清理暂存。
+- **磁盘提示**：设置 › 通用 底部 `LabeledContent("已下载待安装的更新", value: "2 项 · 186 MB")` + `Button("清除")`，v1 可选。
+- 全部更新 / 更新选中 时待安装项与可更新项一起处理；确认 Alert 的计数把它们合并统计。
+
+### 19.5 设置 › 通用 的两项
+
+Section「检查」内，原"发现更新时自动更新"位置：
+
+| 控件 | 文案 | 说明 |
+|---|---|---|
+| `Picker("新关注条目的默认更新方式")` `.pickerStyle(.menu)` | `手动更新` / `空闲时自动更新`，默认手动 | 脚注：`只影响之后新关注的条目；已有条目保留各自的更新方式，可在列表右键"更新方式"中逐条修改。` |
+| `Stepper("空闲判定")` + `TextField` | `无操作 __ 分钟后视为空闲`，1–60，默认 5 | 脚注：`"空闲时自动更新"的条目会等到这么久没有键盘鼠标输入后才开始更新；锁屏与屏幕保护视为空闲。` 默认策略为手动且没有任何条目是自动时，该行 `.foregroundStyle(.secondary)`（仍可改） |
+
+§11"定时检查默认只通知"结论不变：默认策略为"手动更新"，所以零配置下行为与之前完全一致。
+
+### 19.6 策略小标签
+
+灰底胶囊（与 §13.3 的 tag 同样式），`.font(.caption2)`，高 16，文字：
+
+| 策略 | 标签 |
+|---|---|
+| `manual` | `手动` |
+| `auto` | `空闲自动` |
+| `autoDownload` | `自动下载`；`installWhenIdle` 开启时 tooltip 追加 `· 空闲且未运行时自动安装` |
+
+- **主窗口表格**：标签放在名称列、名称文字右侧（与名称同一基线，间距 6），**只在策略 ≠ 手动时显示**——默认态什么都不加，保持 §0 "安静"；看见标签即表示"这个条目 Xup 会自己动"。
+- **设置 › 软件**：所有已关注行都显示（含"手动"），因为这里就是配置的地方，需要一眼对比；可点击弹出菜单修改。
+- **设置 › 应用**：不用胶囊，用只读文字简述（19.3 第 4 条）。
+- 标签 tooltip 给出完整含义，如 `空闲时自动更新：无操作 5 分钟后自动执行`。
+
+### 19.7 config.json 字段
+
+```jsonc
+{
+  "check": {
+    "intervalMinutes": 360,
+    "notify": true,
+    "defaultPolicy": "manual",      // "manual" | "auto"；替代旧 autoUpdate
+    "idleMinutes": 5                // 1–60
+  },
+  "policies": {                     // 缺省条目 = 关注时写入的 defaultPolicy；读不到时按 manual
+    "brew:node": "auto",
+    "npm:typescript": "auto",
+    "app:io.iina.IINA": "autoDownload"
+  },
+  "apps": [
+    { "path": "/Applications/IINA.app", "restartAfterUpdate": true,
+      "installWhenIdle": true,      // 仅 policy == autoDownload 时有意义，默认 false
+      "customSource": null }
+  ]
+}
+```
+
+- `itemID` 形如 `<kind>:<identifier>`，与 §13.1 关注集合的 key 一致（brew formula/cask 名、npm 包名、uv tool 名、agent id、skill name、`name@marketplace`、应用 bundle id）。
+- `policies` 中出现 `autoDownload` 但条目不是应用或来源不支持预下载 → 读取时降级为 `auto` 并写日志 `[xup] app:xxx 的来源不支持预下载，已按"空闲时自动更新"处理`。
+- 取消关注 / 移除应用时删除对应 `policies` 键。
+- schema 与 `SKILL.md`（`xup` 技能）同步补 `policy` 子命令。
+
+### 19.8 对既有章节的影响
+
+- §3：新增 `.staged` 行；`isActionable` 定义扩展。§2.4：默认排序与操作列宽。§4.1 步骤 1："除非设置中开启自动更新"改为"策略为 `auto` 的条目会在空闲时自动执行（§19.2）"。
+- §5.2：面板行支持待安装样式与按钮；摘要行 `N 个待安装 · M 个可更新`。
+- §7.1：两项新控件（19.5）。§7.3 / §17：Sheet 新分组、设置 › 应用 简述追加策略。§13.7：软件 Tab 行增加策略标签。
+- §9：Symbol 清单已补。
+- §11 第三条补充：默认策略手动，零配置行为不变。
+
+## 20. 验收批注三（主代理，2026-11-04，针对 §19）
+- 通过。v1 降级：① 表格里"后台下载中 62%"的百分比不做，状态文案为"后台下载中…"（增量下载进度只进日志）；② 设置 › 通用"已下载待安装 · 清除"行为可选项，若实现成本高可放到 v1.2。
+- 实现顺序：待"更新历史"功能合入后再开工（共用 UpdateCenter / Scheduler / 表格 / CLI）。
+
+---
+
+## 18. 更新历史（2026-11-04 新增）
+
+记录每一次更新（成功与失败都记），回答"昨天定时更新动了什么、哪个失败了、为什么"。数据层 `Core/UpdateHistory.swift`：`UpdateRecord { id, time, kind, itemID, name, detail?, fromVersion, toVersion?, duration, ok, error?, trigger }`，`Trigger = manual | cli | scheduled | auto`；文件 `~/Library/Application Support/Xup/history.jsonl`（每行一条 JSON，追加写，最多 2000 条，超出时重写只留最近 2000 条）。记录点是 `UpdateCenter.updateOne` 的结束（成功 `toVersion = latest`；失败 `error = localizedDescription`，`toVersion = nil`；`duration` 从开始到结束）。
+
+### 18.1 信息架构位置
+
+- 侧栏在"来源"分组下方新增分组 **"记录"**，唯一一项 **"更新历史"**（`clock.arrow.circlepath`），`⌘9`。
+- 角标：最近 24 小时的失败次数，**红色**（`.badge(Text("2").foregroundStyle(.red))`）；为 0 不显示。与来源行的橙色"可更新数"角标语义区分：红 = 需要回头看的失败。
+- 选中后内容区整体切换为 `HistoryView`（不再显示 §2.5 状态栏 / §2.6 日志面板，历史视图有自己的状态栏），副标题 `更新历史 · N 条`。
+- 菜单栏面板 → 主窗口历史视图：见 18.5。
+
+### 18.2 工具栏
+
+| 控件 | 说明 |
+|---|---|
+| 筛选 `Picker`（`.menu`） | `全部`（`line.3.horizontal.decrease.circle`）/ `仅失败`（`exclamationmark.triangle`）；状态存 `UIState.historyFailedOnly` |
+| 搜索 | 复用 `.searchable`，占位 `搜索名称或错误信息`；匹配 name / detail / error / itemID |
+| 清空历史 `trash` | 二次确认 Alert：标题 `清空更新历史？`，正文 `将删除全部 N 条记录，此操作不可撤销。`，按钮 `清空`（destructive）/ `取消`；无记录时禁用 |
+
+### 18.3 列表
+
+`List(selection:)` + `.listStyle(.inset(alternatesRowBackgrounds: true))`，按自然日 `Section` 分组（新的在前），Section 标题 `今天` / `昨天` / `M月d日 EEE`（跨年 `yyyy年M月d日`），标题后缀 `N 条`（`.tertiary`）与 `· M 失败`（红，仅 M > 0）。列表上方一条 24pt 的列标题（`.caption .secondary`，`.bar` 背景），列宽与行共用常量（`HistoryRow`），920 宽窗口（侧栏 210）无横向滚动：
+
+| 列 | 宽 | 内容 |
+|---|---|---|
+| 时间 | 40 | `HH:mm`，`.monospacedDigit` `.secondary`；tooltip 为完整相对日期时间 |
+| 来源 | 16 | `kind.symbol`（`.secondary`），tooltip `kind.title` |
+| 名称 | 弹性 | 上 `name`；下 `detail` `.caption .secondary`，中间截断 |
+| 版本 | 200 | `from → to`；失败且无目标版本只显示 `from`，`.secondary` |
+| 耗时 | 60，右对齐 | `0.8 秒` / `42 秒` / `2 分 05 秒`（`.caption .secondary`） |
+| 结果 | 56 | 徽标，见 18.4 |
+| 触发 | 40 | 小胶囊标签 `手动` / `CLI` / `定时` / `自动`（`.caption2`，`Capsule().fill(.quaternary)`） |
+
+- 右键菜单：`复制错误信息`（无失败项时禁用；多选时每行 `名称：错误`）/ `在列表中定位`（`arrow.right.circle`，单选；切到该记录的来源分区并选中该条目，条目已不在当前列表时禁用，tooltip 说明）/ 分隔线 / `复制名称` / `复制版本`。双击 = 在列表中定位。
+- 底部状态栏 28pt（`.bar`）：左 `共 N 条 · 显示 M 条（有筛选时）· 24 小时内 K 次失败`；右 `上次更新 今天 13:43`。
+
+### 18.4 结果徽标
+
+沿用 §3 的 `.updated` / `.failed` 约定：成功 = `checkmark.seal.fill` + `成功`，`Color.green`；失败 = `xmark.circle.fill` + `失败`，`Color.red`；`.font(.caption)` `.imageScale(.small)`。失败行徽标的 tooltip 为完整 `error`（列表里不再平铺错误文本，避免一行过长；复制走右键菜单）。
+
+### 18.5 空状态与面板文案
+
+- 没有任何记录：`ContentUnavailableView("还没有更新记录", systemImage: "clock.arrow.circlepath")`，描述 `每次更新成功或失败都会记录在这里。`
+- 有记录但搜索无结果：`没有匹配“q”的记录`（`magnifyingglass`）+ `清除搜索`。
+- 有记录但"仅失败"为空：`没有失败的更新`（`checkmark.seal.fill`）+ `最近的更新全部成功。` + `显示全部`。
+- 菜单栏面板（§5.2）摘要区：在"上次检查 …"下方追加一行 `.caption .secondary`：**`上次更新 HH:mm · 成功 N / 失败 M`**（N/M 为当天统计；"失败 M"在 M > 0 时红色；最近一次更新不在今天时显示相对日期 `昨天 11:50`，且当天没有记录时不带成功/失败统计）。整行是 `.plain` 按钮，点击 `ui.sidebar = .history` 并打开主窗口。只在"有可更新"与"全部已是最新"两个状态显示；检查中 / 更新中 / 未选择软件不显示。
+
+### 18.6 CLI / 控制通道
+
+- 控制通道新增 `history`（`limit` 默认 50，`<= 0` 全部；`failedOnly`；`kind`）→ 记录数组（时间倒序，`duration` 保留一位小数）；`history-clear` → `{"cleared": N}`。`update` 命令写入的 `trigger` 为 `cli`。
+- CLI：`xup history [--tail N] [--failed] [--kind k] [--json]`（表格列：时间、名称、版本、结果、触发；失败时结果列为 `失败：<error>`）；`xup history clear --yes`（缺 `--yes` 退出码 1）。

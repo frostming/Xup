@@ -70,10 +70,36 @@ struct AppsProvider: UpdateProvider {
 
         var items: [UpdateItem] = []
         for app in apps {
-            items.append(await checkOne(app, masAvailable: masAvailable, masOutdated: masOutdated, log: log))
+            let item = await checkOne(app, masAvailable: masAvailable, masOutdated: masOutdated, log: log)
+            items.append(Self.applyStagedState(item, app: app, log: log))
         }
-        log("应用: \(items.filter(\.status.isOutdated).count)/\(items.count) 个可更新", false)
+        let staged = items.filter(\.status.isStaged).count
+        log("应用: \(items.filter(\.status.isOutdated).count)/\(items.count) 个可更新" + (staged > 0 ? "，\(staged) 个已下载待安装" : ""), false)
         return items
+    }
+
+    /// §19.4：有新版本且存在**有效**暂存（版本 == latest、文件在、≤ 30 天）→ `.staged(version)`；
+    /// 暂存无效（版本变了 / 过期 / 文件没了）→ 删除并记日志，条目保持"可更新"，下次定时检查重新下载。
+    /// 没有新版本但仍有暂存（用户已自行更新）→ 清理。
+    static func applyStagedState(_ item: UpdateItem, app: ManagedApp, log: @escaping Logger) -> UpdateItem {
+        let bundleID = facts(for: app)?.bundleID
+        guard StagingStore.load(bundleID: bundleID, destination: app.path) != nil else { return item }
+        guard item.status.isOutdated, item.canUpdate, item.supportsStaging, let latest = item.latest else {
+            StagingStore.clear(bundleID: bundleID, destination: app.path)
+            log("\(item.name)：已无新版本或来源不支持预下载，清理暂存", false)
+            return item
+        }
+        let pkg = StagingStore.validPackage(bundleID: bundleID, destination: app.path, latest: latest) { pkg, why in
+            log("\(item.name)：暂存的 \(pkg.version) 已失效（\(why.localizedDescription)），将重新下载", false)
+        }
+        guard pkg != nil else {
+            var copy = item
+            copy.hint = "暂存包已失效，将重新下载"
+            return copy
+        }
+        var copy = item
+        copy.status = .staged(latest)
+        return copy
     }
 
     /// 仅为识别 cask 应用而执行的轻量 Homebrew 查询（不含 formula）。
@@ -226,7 +252,11 @@ struct AppsProvider: UpdateProvider {
         }
 
         do {
-            try await performUpdate(item, app: app, facts: f, log: log, quitIfRunning: quitIfRunning)
+            if case .staged(let v) = item.status {
+                try await installStaged(item, version: v, app: app, facts: f, log: log, quitIfRunning: quitIfRunning)
+            } else {
+                try await performUpdate(item, app: app, facts: f, log: log, quitIfRunning: quitIfRunning)
+            }
             log("\(name) 更新完成，总用时 \(Self.fmt(Date().timeIntervalSince(started)))", false)
         } catch {
             log("\(name) 更新失败（用时 \(Self.fmt(Date().timeIntervalSince(started)))）: \(error.localizedDescription)", true)
@@ -237,6 +267,49 @@ struct AppsProvider: UpdateProvider {
         if state.didQuit { await relaunch(app: app, name: name, bundleID: bundleID, quitPIDs: state.quitPIDs, log: log) }
     }
 
+    /// 可预下载的来源解析结果：下载地址 + 是否按 electron 增量流程下载。
+    struct Download {
+        let url: URL
+        let resolved: AppSources.Resolved?
+        let isElectron: Bool
+    }
+
+    enum StageError: LocalizedError {
+        case unsupported(String)
+        case notFound
+
+        var errorDescription: String? {
+            switch self {
+            case .unsupported(let what): return "该应用由 \(what) 执行安装，不支持预下载"
+            case .notFound: return "应用不存在"
+            }
+        }
+    }
+
+    /// 解析 Sparkle / electron-updater / 自定义来源的下载地址；cask / mas / 自更新返回 nil（不可预下载）。
+    private func resolveDownload(_ item: UpdateItem, app: ManagedApp, facts f: BundleFacts) async throws -> Download? {
+        let detail = item.detail ?? ""
+        if let source = app.source {
+            let r = try await AppSources.resolve(source)
+            guard let url = r.downloadURL else { throw ShellError.failed(item.name, 1, r.hint ?? AppSources.noMacAssetHint) }
+            if case .electronYML = source { return Download(url: url, resolved: r, isElectron: true) }
+            return Download(url: url, resolved: r, isElectron: false)
+        }
+        if detail.hasPrefix("Sparkle"), let feed = f.feedURL {
+            let items = try await AppcastParser.fetch(feed)
+            guard let newest = AppcastParser.newest(in: items), let url = newest.enclosureURL else {
+                throw ShellError.failed(item.name, 1, "appcast 无下载地址")
+            }
+            return Download(url: url, resolved: nil, isElectron: false)
+        }
+        if detail.hasPrefix("electron-updater"), let yml = AppSources.electronFeedURL(appPath: app.path) {
+            let r = try await AppSources.resolveElectron(yml)
+            guard let url = r.downloadURL else { throw ShellError.failed(item.name, 1, r.hint ?? AppSources.noMacAssetHint) }
+            return Download(url: url, resolved: r, isElectron: true)
+        }
+        return nil
+    }
+
     /// 按来源执行更新。Sparkle / electron / 自定义来源：先下载解压校验，`beforeReplace` 钩子里再退出应用（缩短应用离线窗口）。
     /// Homebrew cask / mas：命令本身会操作应用包，保持先退出再执行。
     private func performUpdate(_ item: UpdateItem, app: ManagedApp, facts f: BundleFacts, log: @escaping Logger,
@@ -244,13 +317,11 @@ struct AppsProvider: UpdateProvider {
         let detail = item.detail ?? ""
         let beforeReplace: @Sendable () async throws -> Void = { try await quitIfRunning("替换前检查", true) }
 
-        if let source = app.source {
-            let r = try await AppSources.resolve(source)
-            guard let url = r.downloadURL else { throw ShellError.failed(item.name, 1, r.hint ?? AppSources.noMacAssetHint) }
-            if case .electronYML = source {
-                try await installElectron(from: url, resolved: r, app: app, facts: f, log: log, beforeReplace: beforeReplace)
+        if let dl = try await resolveDownload(item, app: app, facts: f) {
+            if dl.isElectron, let r = dl.resolved {
+                try await installElectron(from: dl.url, resolved: r, app: app, facts: f, log: log, beforeReplace: beforeReplace)
             } else {
-                try await AppInstaller.install(from: url, into: app.path, expectedBundleID: f.bundleID, log: log, beforeReplace: beforeReplace)
+                try await AppInstaller.install(from: dl.url, into: app.path, expectedBundleID: f.bundleID, log: log, beforeReplace: beforeReplace)
             }
         } else if detail.hasPrefix("Homebrew cask ") {
             let token = String(detail.dropFirst("Homebrew cask ".count))
@@ -260,16 +331,6 @@ struct AppsProvider: UpdateProvider {
             cmd.append(token)
             log("$ " + cmd.joined(separator: " "), false)
             try await Shell.runChecked(cmd, timeout: 1800, onOutput: log)
-        } else if detail.hasPrefix("Sparkle"), let feed = f.feedURL {
-            let items = try await AppcastParser.fetch(feed)
-            guard let newest = AppcastParser.newest(in: items), let url = newest.enclosureURL else {
-                throw ShellError.failed(item.name, 1, "appcast 无下载地址")
-            }
-            try await AppInstaller.install(from: url, into: app.path, expectedBundleID: f.bundleID, log: log, beforeReplace: beforeReplace)
-        } else if detail.hasPrefix("electron-updater"), let yml = AppSources.electronFeedURL(appPath: app.path) {
-            let r = try await AppSources.resolveElectron(yml)
-            guard let url = r.downloadURL else { throw ShellError.failed(item.name, 1, r.hint ?? AppSources.noMacAssetHint) }
-            try await installElectron(from: url, resolved: r, app: app, facts: f, log: log, beforeReplace: beforeReplace)
         } else if detail.hasPrefix("App Store (mas "), let id = detail.split(separator: " ").last?.dropLast() {
             try await quitIfRunning("mas upgrade 前", false)
             let cmd = ["mas", "upgrade", String(id)]
@@ -278,6 +339,63 @@ struct AppsProvider: UpdateProvider {
         } else {
             throw ShellError.failed(item.name, 1, "此来源不支持自动更新")
         }
+    }
+
+    /// §19.4 "安装并重启"：对已暂存的包直接 `apply`（退出 → 替换 → 重开），不再下载。
+    /// 暂存在此刻被发现失效时回退到正常下载流程。
+    private func installStaged(_ item: UpdateItem, version: String, app: ManagedApp, facts f: BundleFacts, log: @escaping Logger,
+                               quitIfRunning: @escaping @Sendable (_ stage: String, _ abortIfNoRestart: Bool) async throws -> Void) async throws {
+        let pkg = StagingStore.validPackage(bundleID: f.bundleID, destination: app.path, latest: version) { pkg, why in
+            log("\(item.name)：暂存的 \(pkg.version) 已失效（\(why.localizedDescription)），改为重新下载", true)
+        }
+        guard let pkg else {
+            try await performUpdate(item, app: app, facts: f, log: log, quitIfRunning: quitIfRunning)
+            return
+        }
+        log("安装已暂存的 \(item.name) \(pkg.version)（\(pkg.appPath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))）", false)
+        try await AppInstaller.apply(staged: pkg, beforeReplace: { try await quitIfRunning("替换前检查", true) }, log: log)
+        StagingStore.clear(bundleID: f.bundleID, destination: app.path)
+    }
+
+    /// §19.1 "自动下载，手动重启"：后台下载 → 校验 → 解压到持久暂存目录，不替换、不退出应用。
+    /// 仅 Sparkle / electron-updater / 手动配置来源可用；cask / mas / 自更新抛 `StageError.unsupported`。
+    func stage(_ item: UpdateItem, log: @escaping Logger) async throws -> StagedPackage {
+        let path = String(item.id.dropFirst("app:".count))
+        guard let app = apps.first(where: { $0.path == path }), let f = Self.facts(for: app) else { throw StageError.notFound }
+        let detail = item.detail ?? ""
+        guard item.supportsStaging else {
+            if detail.hasPrefix("Homebrew cask") { throw StageError.unsupported("Homebrew") }
+            if detail.hasPrefix("App Store") { throw StageError.unsupported("App Store") }
+            throw StageError.unsupported("应用自身")
+        }
+        guard let dl = try await resolveDownload(item, app: app, facts: f) else { throw StageError.unsupported("其它方式") }
+        let started = Date()
+        log("后台下载 \(f.name) \(item.latest ?? "?")（不替换、不退出应用）", false)
+        let dir = StagingStore.directory(bundleID: f.bundleID, destination: app.path, version: item.latest ?? "unknown")
+        // 旧版本的暂存先清掉（远端出现更高版本 → 丢弃旧暂存）。
+        StagingStore.clear(bundleID: f.bundleID, destination: app.path)
+        var pkg: StagedPackage
+        if dl.isElectron, let r = dl.resolved, DeltaDownloadPolicy.isEnabled, dl.url.pathExtension.lowercased() == "zip" {
+            let session = ElectronDeltaSession(bundleID: f.bundleID, expectedSHA512: r.sha512, expectedSize: r.size,
+                                               updaterCacheDirName: AppSources.electronUpdaterCacheDirName(appPath: app.path))
+            defer { session.cleanup() }
+            pkg = try await AppInstaller.prepare(from: dl.url, into: app.path, expectedBundleID: f.bundleID, stagingDir: dir,
+                                                 download: { u, l in try await session.download(u, log: l) }, log: log)
+            session.commit(log: log)
+        } else {
+            pkg = try await AppInstaller.prepare(from: dl.url, into: app.path, expectedBundleID: f.bundleID, stagingDir: dir, log: log)
+        }
+        if let latest = item.latest, pkg.version != latest, VersionCompare.compare(pkg.version, latest) == .orderedSame {
+            pkg.version = latest  // 等价写法（如 1.5 与 1.5.0）统一成列表显示的版本
+        }
+        try StagingStore.save(pkg)
+        log("\(f.name) \(pkg.version) 已下载并校验，待安装（用时 \(Self.fmt(Date().timeIntervalSince(started)))）", false)
+        return pkg
+    }
+
+    /// 清理某应用的暂存（改回其它策略 / 移除应用时）。
+    static func clearStaged(for app: ManagedApp) {
+        StagingStore.clear(bundleID: facts(for: app)?.bundleID, destination: app.path)
     }
 
     /// electron-updater 来源：zip 且开关打开时走 blockmap 增量下载（失败自动回退整包），成功后缓存新包作为下次基准。

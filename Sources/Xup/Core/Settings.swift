@@ -88,9 +88,15 @@ final class AppSettings: ObservableObject {
         get { config.check.notify }
         set { mutate { $0.check.notify = newValue } }
     }
-    var autoUpdate: Bool {
-        get { config.check.autoUpdate }
-        set { mutate { $0.check.autoUpdate = newValue } }
+    /// §19.5 新关注条目的默认更新方式（manual / auto）。
+    var defaultPolicy: UpdatePolicy {
+        get { config.check.defaultPolicy }
+        set { mutate { $0.check.defaultPolicy = newValue == .autoDownload ? .auto : newValue } }
+    }
+    /// §19.2 空闲判定阈值（分钟，1–60）。
+    var idleMinutes: Int {
+        get { config.check.idleMinutes }
+        set { mutate { $0.check.idleMinutes = min(60, max(1, newValue)) } }
     }
     var showUpToDate: Bool {
         get { config.ui.showUpToDate }
@@ -127,6 +133,93 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    // MARK: - 更新方式（§19）
+
+    /// 日志出口（降级提示等）；由 AppModel 接到 UpdateCenter。
+    var log: ((_ text: String) -> Void)?
+    private var loggedDowngrades: Set<String> = []
+
+    /// config.json 里记录的原始策略（不降级）；无记录为 nil。
+    func storedPolicy(for itemID: String) -> UpdatePolicy? {
+        if let p = config.policies[itemID] { return p }
+        // homebrew：`homebrew:formula/node` 回退到关注名形式 `homebrew:node`。
+        if itemID.hasPrefix("homebrew:") {
+            let suffix = itemID.dropFirst("homebrew:".count)
+            if let slash = suffix.firstIndex(of: "/") {
+                let token = suffix[suffix.index(after: slash)...]
+                if let p = config.policies["homebrew:\(token)"] { return p }
+            }
+        }
+        return nil
+    }
+
+    /// 条目的生效策略：无记录取 `defaultPolicy`；`autoDownload` 仅对应用有效，非应用读到时降级为 auto 并记一次日志。
+    /// 来源是否支持预下载需要条目信息，见 `policy(for item:)`。
+    func policy(for itemID: String) -> UpdatePolicy {
+        let p = storedPolicy(for: itemID) ?? defaultPolicy
+        if p == .autoDownload, !itemID.hasPrefix("app:") {
+            logDowngrade(itemID, reason: "不是应用")
+            return .auto
+        }
+        return p
+    }
+
+    /// 条目的生效策略（含"来源不支持预下载"的降级）。
+    func policy(for item: UpdateItem) -> UpdatePolicy {
+        let p = policy(for: item.id)
+        if p == .autoDownload, !item.supportsStaging {
+            logDowngrade(item.id, reason: "来源不支持预下载")
+            return .auto
+        }
+        return p
+    }
+
+    private func logDowngrade(_ itemID: String, reason: String) {
+        guard loggedDowngrades.insert(itemID).inserted else { return }
+        log?("\(itemID) 的\(reason)，已按“空闲时自动更新”处理")
+    }
+
+    /// 写入策略；传 nil 删除记录（回到默认）。`autoDownload` 只接受 `app:` 前缀的 id。
+    func setPolicy(_ policy: UpdatePolicy?, for itemID: String) {
+        var value = policy
+        if value == .autoDownload, !itemID.hasPrefix("app:") { value = .auto }
+        mutate { cfg in
+            // 同一 homebrew 条目可能同时存在 formula/cask 形式与 token 形式的键，统一清掉旧键再写。
+            for k in Self.aliasKeys(for: itemID) { cfg.policies[k] = nil }
+            cfg.policies[itemID] = value
+        }
+        loggedDowngrades.remove(itemID)
+    }
+
+    func setPolicy(_ policy: UpdatePolicy?, for itemIDs: some Sequence<String>) {
+        for id in itemIDs { setPolicy(policy, for: id) }
+    }
+
+    /// 应用的 `installWhenIdle` 子开关。
+    func installWhenIdle(path: String) -> Bool {
+        managedApps.first { $0.path == path }?.installWhenIdle ?? false
+    }
+
+    func setInstallWhenIdle(path: String, _ on: Bool) {
+        mutate { cfg in
+            guard let idx = cfg.apps.firstIndex(where: { $0.path == path }) else { return }
+            cfg.apps[idx].installWhenIdle = on
+        }
+    }
+
+    /// 某 id 的所有等价键（homebrew 的 formula/cask/token 三种）。
+    nonisolated static func aliasKeys(for itemID: String) -> [String] {
+        guard itemID.hasPrefix("homebrew:") else { return [itemID] }
+        var suffix = String(itemID.dropFirst("homebrew:".count))
+        if let slash = suffix.firstIndex(of: "/") { suffix = String(suffix[suffix.index(after: slash)...]) }
+        return ["homebrew:\(suffix)", "homebrew:formula/\(suffix)", "homebrew:cask/\(suffix)"]
+    }
+
+    /// 取消关注 / 移除应用时删除对应的 policies 键。
+    private func removePolicies(for itemIDs: [String], in cfg: inout XupConfig) {
+        for id in itemIDs { for k in Self.aliasKeys(for: id) { cfg.policies[k] = nil } }
+    }
+
     // MARK: - 受管应用
 
     var managedApps: [ManagedApp] { config.apps }
@@ -148,7 +241,10 @@ final class AppSettings: ObservableObject {
     }
 
     func removeApp(path: String) {
-        mutate { $0.apps.removeAll { $0.path == path } }
+        mutate { cfg in
+            cfg.apps.removeAll { $0.path == path }
+            removePolicies(for: ["app:\(path)"], in: &cfg)
+        }
     }
 
     func setRestart(path: String, _ restart: Bool) {
@@ -175,8 +271,13 @@ final class AppSettings: ObservableObject {
         config.tracked[kind].contains(name)
     }
 
+    /// 新关注条目不写 policies 记录（自然继承 defaultPolicy）；被取消关注的条目删除记录。
     func setTracked(_ kind: ProviderKind, names: Set<String>) {
-        mutate { $0.tracked[kind] = names }
+        mutate { cfg in
+            let removed = cfg.tracked[kind].subtracting(names)
+            cfg.tracked[kind] = names
+            removePolicies(for: removed.map { "\(kind.rawValue):\($0)" }, in: &cfg)
+        }
     }
 
     func track(_ kind: ProviderKind, _ name: String) {
@@ -186,7 +287,10 @@ final class AppSettings: ObservableObject {
 
     func untrack(_ kind: ProviderKind, _ name: String) {
         guard isTracked(kind, name) else { return }
-        mutate { $0.tracked[kind].remove(name) }
+        mutate { cfg in
+            cfg.tracked[kind].remove(name)
+            removePolicies(for: ["\(kind.rawValue):\(name)"], in: &cfg)
+        }
     }
 
     // MARK: - 配置文件

@@ -5,13 +5,21 @@ import SwiftUI
 enum SidebarItem: Hashable {
     case all
     case kind(ProviderKind)
+    /// §18 "记录 › 更新历史"。
+    case history
 
     var kind: ProviderKind? {
         if case .kind(let k) = self { return k }
         return nil
     }
 
-    var title: String { kind?.title ?? "全部" }
+    var title: String {
+        switch self {
+        case .all: return "全部"
+        case .kind(let k): return k.title
+        case .history: return "更新历史"
+        }
+    }
 }
 
 /// 设置窗口的 Tab（§13.7：原"选择软件…"Sheet 并入为"软件"Tab）。
@@ -47,6 +55,9 @@ final class UIState: ObservableObject {
     @Published var pickerKind: ProviderKind = .homebrew
     /// §16.3 "配置更新来源" Sheet 的目标应用（nil 为关闭）。
     @Published var sourceSheetApp: ManagedApp?
+    /// §18 更新历史：筛选"仅失败"；工具栏"清空历史"请求（由 HistoryView 弹二次确认）。
+    @Published var historyFailedOnly = false
+    @Published var historyClearRequested = false
     /// 首次启动（从未检查过）时自动打开一次主窗口。
     let openMainWindowOnLaunch: Bool
     /// 调试：`XUP_DEBUG_OPEN_WINDOW=1` 启动即打开主窗口。
@@ -64,8 +75,8 @@ final class UIState: ObservableObject {
             || d.object(forKey: "lastCheckedAt") == nil
             || (!d.bool(forKey: Self.hasSeenWatchPickerKey) && ConfigStore.quickTrackedIsEmpty())
         // 调试：`XUP_DEBUG_SIDEBAR=<ProviderKind.rawValue>` 指定启动时选中的分区。
-        if let raw = env["XUP_DEBUG_SIDEBAR"], let k = ProviderKind(rawValue: raw) {
-            sidebar = .kind(k)
+        if let raw = env["XUP_DEBUG_SIDEBAR"] {
+            if raw == "history" { sidebar = .history } else if let k = ProviderKind(rawValue: raw) { sidebar = .kind(k) }
         }
         // 调试：`XUP_DEBUG_SETTINGS=watch:plugin` 启动后自动打开设置窗口到指定 Tab（watch 可带来源分段）。
         if let raw = env["XUP_DEBUG_SETTINGS"] {
@@ -141,6 +152,16 @@ final class UIState: ObservableObject {
         }
     }
 
+    /// 状态栏闪一行提示（3 秒），如 §19.3 "已将 3 项设为“空闲时自动更新”"。
+    func flash(_ text: String) {
+        completion = (text, false)
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard let self, self.batch == nil, self.completion?.text == text else { return }
+            self.completion = nil
+        }
+    }
+
     func updateAll(center: UpdateCenter, kind: ProviderKind?) {
         update(ids: Set(center.items(for: kind).filter(\.isActionable).map(\.id)), center: center)
     }
@@ -150,6 +171,14 @@ final class UIState: ObservableObject {
         sidebar = .all
         search = ""
         selection = [item.id]
+    }
+
+    /// §18 从历史记录"在列表中定位"：切到对应来源分区并选中该条目（条目已不存在时不做任何事）。
+    func reveal(record: UpdateRecord, center: UpdateCenter) {
+        guard center.items.contains(where: { $0.id == record.itemID }) else { return }
+        sidebar = .kind(record.kind)
+        search = ""
+        selection = [record.itemID]
     }
 
     /// 批次进度：(已完成数, 总数, 当前条目名)。
@@ -170,16 +199,17 @@ extension UpdateItem {
         return false
     }
 
-    /// 默认排序权重：可更新 → 失败 → 未知 → 更新中 → 已更新 → 最新。
+    /// 默认排序权重：待安装 → 可更新 → 失败 → 未知 → 更新中 → 已更新 → 最新。
     var statusRank: Int {
         switch status {
-        case .outdated: return canUpdate ? 0 : 1
-        case .failed: return 2
-        case .unknown: return 3
-        case .checking: return 4
-        case .updating: return 5
-        case .updated: return 6
-        case .upToDate: return 7
+        case .staged: return 0
+        case .outdated: return canUpdate ? 1 : 2
+        case .failed: return 3
+        case .unknown: return 4
+        case .checking: return 5
+        case .updating: return 6
+        case .updated: return 7
+        case .upToDate: return 8
         }
     }
 

@@ -101,7 +101,7 @@ final class BlockmapTests: XCTestCase {
         }
 
         func fetch(_ url: URL) async throws -> Data {
-            lock.lock(); fetched.append(url.lastPathComponent); lock.unlock()
+            lock.withLock { fetched.append(url.lastPathComponent) }
             return try Data(contentsOf: try local(url))
         }
 
@@ -110,10 +110,10 @@ final class BlockmapTests: XCTestCase {
             let slice: Data
             if let range {
                 guard acceptsRanges else { throw DeltaError.rangesUnsupported }
-                lock.lock(); ranges.append(range); lock.unlock()
+                lock.withLock { ranges.append(range) }
                 slice = all[Int(range.lowerBound)...Int(range.upperBound)]
             } else {
-                lock.lock(); fullDownloads.append(url.lastPathComponent); lock.unlock()
+                lock.withLock { fullDownloads.append(url.lastPathComponent) }
                 slice = all
             }
             let out = FileManager.default.temporaryDirectory.appendingPathComponent("ft-\(UUID().uuidString)")

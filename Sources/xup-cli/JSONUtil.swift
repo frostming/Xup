@@ -216,6 +216,9 @@ struct SchemaValidator {
         if let n = value as? NSNumber, !JSON.isBool(n), let min = (s["minimum"] as? NSNumber)?.doubleValue, n.doubleValue < min {
             report.errors.append("\(here) 不能小于 \(Int(min))")
         }
+        if let n = value as? NSNumber, !JSON.isBool(n), let max = (s["maximum"] as? NSNumber)?.doubleValue, n.doubleValue > max {
+            report.errors.append("\(here) 不能大于 \(Int(max))")
+        }
         if let str = value as? String, let pattern = s["pattern"] as? String,
            let re = try? NSRegularExpression(pattern: pattern),
            re.firstMatch(in: str, range: NSRange(str.startIndex..., in: str)) == nil {
@@ -230,6 +233,8 @@ struct SchemaValidator {
                 let child = path.isEmpty ? k : "\(path).\(k)"
                 if let ps = props[k] as? [String: Any] {
                     walk(v, ps, path: child, strict: strict, report: &report)
+                } else if let ap = s["additionalProperties"] as? [String: Any] {
+                    walk(v, ap, path: child, strict: strict, report: &report)
                 } else if let ap = s["additionalProperties"] as? Bool, ap == false {
                     let known = props.keys.sorted().joined(separator: ", ")
                     let msg = "未知字段 \(child)" + (known.isEmpty ? "" : "（可用：\(known)）")

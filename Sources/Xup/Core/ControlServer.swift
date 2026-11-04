@@ -244,8 +244,8 @@ enum ControlCommands {
         return f
     }()
 
-    static func makeHandler(center: UpdateCenter, settings: AppSettings) -> ControlServer.Handler {
-        return { req in try await dispatch(req, center: center, settings: settings) }
+    static func makeHandler(center: UpdateCenter, settings: AppSettings, scheduler: Scheduler? = nil) -> ControlServer.Handler {
+        return { req in try await dispatch(req, center: center, settings: settings, scheduler: scheduler) }
     }
 
     private static func kind(_ raw: String) throws -> ProviderKind {
@@ -256,18 +256,72 @@ enum ControlCommands {
         return k
     }
 
-    static func dispatch(_ req: ControlServer.Request, center: UpdateCenter, settings: AppSettings) async throws -> Any {
+    static func dispatch(_ req: ControlServer.Request, center: UpdateCenter, settings: AppSettings, scheduler: Scheduler? = nil) async throws -> Any {
         switch req.cmd {
         case "ping":
             return ["pid": ProcessInfo.processInfo.processIdentifier, "version": appVersion]
 
         case "status":
-            return status(center: center, settings: settings)
+            return status(center: center, settings: settings, scheduler: scheduler)
 
         case "items":
             var list = center.items
             if let k = req.string("kind") { let kk = try kind(k); list = list.filter { $0.kind == kk } }
-            return list.sorted { $0.id < $1.id }.map(encode)
+            return list.sorted { $0.id < $1.id }.map { encode($0, settings: settings) }
+
+        case "stage":
+            // §19.4 预下载：只下载暂存，不替换、不退出应用。
+            guard let list = req.strings("ids"), !list.isEmpty else { throw ControlServer.CommandError("缺少 ids") }
+            let ids = Set(list)
+            let known = Set(center.items.map(\.id))
+            let unknown = ids.subtracting(known).sorted()
+            if !unknown.isEmpty { throw ControlServer.CommandError("未知 id：\(unknown.joined(separator: ", "))（先执行 check）") }
+            let targets = center.items.filter { ids.contains($0.id) }
+            let unsupported = targets.filter { !$0.supportsStaging }.map(\.id).sorted()
+            let stageable = Set(targets.filter { $0.supportsStaging && $0.status.isOutdated }.map(\.id))
+            let alreadyStaged = targets.filter { $0.status.isStaged }.map(\.id).sorted()
+            if stageable.isEmpty {
+                return ["staged": alreadyStaged, "skipped": unsupported, "note": unsupported.isEmpty ? "没有需要预下载的条目" : "所选条目的来源不支持预下载（仅 Sparkle / electron-updater / 手动配置来源的应用）"]
+            }
+            let mark = center.log.last?.id
+            if req.bool("wait") {
+                let done = await center.stage(ids: stageable)
+                return [
+                    "staged": done.union(alreadyStaged).sorted(),
+                    "failed": stageable.subtracting(done).sorted(),
+                    "skipped": unsupported,
+                    "items": center.items.filter { ids.contains($0.id) }.sorted { $0.id < $1.id }.map { encode($0, settings: settings) },
+                    "log": center.logLines(after: mark).map(encode),
+                ]
+            }
+            Task { await center.stage(ids: stageable) }
+            return ["started": stageable.sorted(), "skipped": unsupported]
+
+        case "policy-get":
+            guard let id = req.string("id") else { throw ControlServer.CommandError("缺少 id") }
+            return policyEntry(id, center: center, settings: settings)
+
+        case "policy-list":
+            var ids = Set(settings.config.policies.keys)
+            ids.formUnion(center.items.map(\.id))
+            for (k, names) in settings.tracked { for n in names { ids.insert("\(k.rawValue):\(n)") } }
+            for app in settings.managedApps { ids.insert(app.itemID) }
+            // 同一 homebrew 条目：列表里有 formula/cask 形式时省略 token 形式。
+            let full = Set(ids.filter { $0.hasPrefix("homebrew:") && $0.contains("/") }.map { AppSettings.aliasKeys(for: $0)[0] })
+            let list = ids.filter { !($0.hasPrefix("homebrew:") && !$0.contains("/") && full.contains($0)) }
+            return ["defaultPolicy": settings.defaultPolicy.rawValue, "idleMinutes": settings.idleMinutes,
+                    "items": list.sorted().map { policyEntry($0, center: center, settings: settings) }]
+
+        case "policy-set":
+            guard let list = req.strings("ids"), !list.isEmpty else { throw ControlServer.CommandError("缺少 ids") }
+            guard let raw = req.string("policy"), let policy = UpdatePolicy(cli: raw) else {
+                throw ControlServer.CommandError("policy 必须是 manual / auto / autoDownload")
+            }
+            center.setPolicy(policy, for: Set(list))
+            if let on = req.params["installWhenIdle"] as? Bool {
+                for id in list where id.hasPrefix("app:") { settings.setInstallWhenIdle(path: String(id.dropFirst(4)), on) }
+            }
+            return list.sorted().map { policyEntry($0, center: center, settings: settings) }
 
         case "installed":
             guard let k = req.string("kind") else { throw ControlServer.CommandError("缺少 kind") }
@@ -315,17 +369,17 @@ enum ControlCommands {
             }
             let mark = center.log.last?.id
             if req.bool("wait") {
-                await center.update(ids: Set(targets.map(\.id)))
+                await center.update(ids: Set(targets.map(\.id)), trigger: .cli)
                 let done = center.items.filter { ids.contains($0.id) }
                 return [
-                    "items": done.sorted { $0.id < $1.id }.map(encode),
+                    "items": done.sorted { $0.id < $1.id }.map { encode($0, settings: settings) },
                     "skipped": skipped,
                     "succeeded": done.filter { $0.status == .updated }.map(\.id).sorted(),
                     "failed": done.filter { if case .failed = $0.status { return true }; return false }.map(\.id).sorted(),
                     "log": center.logLines(after: mark).map(encode),
                 ]
             }
-            Task { await center.update(ids: Set(targets.map(\.id))) }
+            Task { await center.update(ids: Set(targets.map(\.id)), trigger: .cli) }
             return ["started": targets.map(\.id).sorted(), "skipped": skipped]
 
         case "probe-source":
@@ -362,6 +416,19 @@ enum ControlCommands {
             if n > 0, lines.count > n { lines = Array(lines.suffix(n)) }
             return lines.map(encode)
 
+        case "history":
+            // 参数：limit（默认 50，<=0 为全部）、failedOnly、kind；按时间倒序。
+            var k: ProviderKind?
+            if let raw = req.string("kind"), !raw.isEmpty { k = try kind(raw) }
+            let limit = req.int("limit") ?? 50
+            return center.history.records(kind: k, failedOnly: req.bool("failedOnly"), limit: limit).map(encode)
+
+        case "history-clear":
+            let n = center.history.records.count
+            center.history.clear()
+            center.appendLog(source: "控制", text: "已清空更新历史（\(n) 条）")
+            return ["cleared": n]
+
         case "launch":
             guard let path = req.string("path") else { throw ControlServer.CommandError("缺少 path") }
             guard FileManager.default.fileExists(atPath: path) else { throw ControlServer.CommandError("应用不存在：\(path)") }
@@ -379,7 +446,23 @@ enum ControlCommands {
         return (info["CFBundleShortVersionString"] as? String ?? "dev") + " (" + (info["CFBundleVersion"] as? String ?? "0") + ")"
     }
 
-    static func status(center: UpdateCenter, settings: AppSettings) -> [String: Any] {
+    /// 一条策略记录：生效策略、配置里的原始值（无则 null）、是否降级、installWhenIdle。
+    static func policyEntry(_ id: String, center: UpdateCenter, settings: AppSettings) -> [String: Any] {
+        let item = center.items.first { $0.id == id }
+        let stored = settings.storedPolicy(for: id)
+        let effective = item.map { settings.policy(for: $0) } ?? settings.policy(for: id)
+        var d: [String: Any] = [
+            "id": id, "policy": effective.rawValue,
+            "stored": stored?.rawValue ?? NSNull(),
+            "inherited": stored == nil,
+            "downgraded": stored == .autoDownload && effective != .autoDownload,
+        ]
+        if let item { d["name"] = item.name; d["status"] = statusKey(item.status); d["supportsStaging"] = item.supportsStaging }
+        if id.hasPrefix("app:") { d["installWhenIdle"] = settings.installWhenIdle(path: String(id.dropFirst(4))) }
+        return d
+    }
+
+    static func status(center: UpdateCenter, settings: AppSettings, scheduler: Scheduler? = nil) -> [String: Any] {
         var byKind: [String: Int] = [:]
         for k in ProviderKind.allCases { byKind[k.rawValue] = center.count(for: k) }
         return [
@@ -387,9 +470,14 @@ enum ControlCommands {
             "lastChecked": center.lastChecked.map { iso.string(from: $0) } ?? NSNull(),
             "isChecking": center.isChecking,
             "updating": center.updatingIDs.sorted(),
+            "staging": center.stagingIDs.sorted(),
+            "pendingAuto": scheduler?.pendingAutoIDs.sorted() ?? [],
+            "defaultPolicy": settings.defaultPolicy.rawValue,
+            "idleMinutes": settings.idleMinutes,
             "counts": [
                 "items": center.items.count,
                 "outdated": center.outdatedCount,
+                "staged": center.stagedCount,
                 "actionable": center.actionableItems.count,
                 "byKind": byKind,
             ],
@@ -399,7 +487,8 @@ enum ControlCommands {
             "apps": settings.managedApps.map(\.path),
             "items": center.items.sorted { $0.id < $1.id }.map { item -> [String: Any] in
                 var d: [String: Any] = ["id": item.id, "name": item.name, "kind": item.kind.rawValue,
-                                        "installed": item.installed, "status": statusKey(item.status), "actionable": item.isActionable]
+                                        "installed": item.installed, "status": statusKey(item.status), "actionable": item.isActionable,
+                                        "policy": settings.policy(for: item).rawValue]
                 if let l = item.latest { d["latest"] = l }
                 return d
             },
@@ -416,14 +505,17 @@ enum ControlCommands {
         case .updating: return "updating"
         case .updated: return "updated"
         case .failed: return "failed"
+        case .staged: return "staged"
         }
     }
 
-    static func encode(_ item: UpdateItem) -> [String: Any] {
+    static func encode(_ item: UpdateItem, settings: AppSettings? = nil) -> [String: Any] {
         var d: [String: Any] = [
             "id": item.id, "kind": item.kind.rawValue, "name": item.name, "installed": item.installed,
             "status": statusKey(item.status), "canUpdate": item.canUpdate, "actionable": item.isActionable,
         ]
+        if let settings { d["policy"] = settings.policy(for: item).rawValue }
+        if let v = item.status.stagedVersion { d["stagedVersion"] = v }
         if let v = item.latest { d["latest"] = v }
         if let v = item.detail { d["detail"] = v }
         if let v = item.hint { d["hint"] = v }
@@ -433,5 +525,18 @@ enum ControlCommands {
 
     static func encode(_ line: LogLine) -> [String: Any] {
         ["time": iso.string(from: line.time), "source": line.source, "text": line.text, "isError": line.isError]
+    }
+
+    static func encode(_ r: UpdateRecord) -> [String: Any] {
+        var d: [String: Any] = [
+            "id": r.id.uuidString, "time": iso.string(from: r.time), "kind": r.kind.rawValue, "itemID": r.itemID,
+            "name": r.name, "fromVersion": r.fromVersion, "ok": r.ok, "trigger": r.trigger.rawValue,
+            // 保留一位小数输出（JSONSerialization 对 Double 会打出 48.299999999999997）。
+            "duration": NSDecimalNumber(string: String(format: "%.1f", r.duration)),
+        ]
+        if let v = r.detail { d["detail"] = v }
+        if let v = r.toVersion { d["toVersion"] = v }
+        if let v = r.error { d["error"] = v }
+        return d
     }
 }

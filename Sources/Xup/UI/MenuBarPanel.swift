@@ -4,13 +4,18 @@ import SwiftUI
 /// §5.2 菜单栏面板，宽 320，四态：有更新 / 全部最新 / 检查中 / 更新中。
 struct MenuBarPanel: View {
     @EnvironmentObject private var center: UpdateCenter
+    @EnvironmentObject private var history: UpdateHistory
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var scheduler: Scheduler
     @EnvironmentObject private var ui: UIState
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
     private var actionable: [UpdateItem] { center.items(for: nil).filter(\.isActionable) }
-    private var outdated: [UpdateItem] { center.items(for: nil).filter { $0.status.isOutdated } }
+    /// 待安装置顶，其后是可更新（`items(for:)` 已按此排序）。
+    private var outdated: [UpdateItem] { center.items(for: nil).filter { $0.status.isOutdated || $0.status.isStaged } }
+    private var stagedCount: Int { outdated.filter { $0.status.isStaged }.count }
+    private var pendingAuto: Int { scheduler.pendingAutoIDs.count }
     private var isUpdating: Bool { !center.updatingIDs.isEmpty }
     private var failedCount: Int { center.items.filter(\.isFailed).count }
     /// §13.5 (4)：没有选择任何要跟踪的软件。
@@ -32,6 +37,7 @@ struct MenuBarPanel: View {
         }
         .frame(width: 320)
         .ignoresSafeArea()
+        .background(WindowSnapshotHook("panel", delay: 1.5))
     }
 
     // MARK: 摘要
@@ -51,7 +57,7 @@ struct MenuBarPanel: View {
             } else if isUpdating {
                 ProgressView().controlSize(.small)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("正在自动更新…").font(.headline)
+                    Text(scheduler.isAutoUpdating ? "正在自动更新 \(center.items.first { center.updatingIDs.contains($0.id) }?.name ?? "")…" : "正在更新…").font(.headline)
                     Text(XupFormat.lastChecked(center.lastChecked)).font(.caption).foregroundStyle(.secondary)
                 }
             } else if center.isChecking {
@@ -70,13 +76,19 @@ struct MenuBarPanel: View {
                 }
                 Spacer()
             } else if !outdated.isEmpty {
-                Image(systemName: "arrow.up.circle.fill").foregroundStyle(.orange).font(.title3)
+                Image(systemName: stagedCount > 0 ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                    .foregroundStyle(stagedCount > 0 ? .blue : .orange).font(.title3)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 0) {
-                        Text("\(outdated.count) 个可更新").font(.headline)
+                        // §19.4：`1 个待安装 · 4 个可更新`
+                        Text((stagedCount > 0 ? "\(stagedCount) 个待安装 · " : "") + "\(outdated.count - stagedCount) 个可更新").font(.headline)
                         if failedCount > 0 { Text(" · \(failedCount) 个失败").font(.caption).foregroundStyle(.red) }
                     }
                     Text(XupFormat.lastChecked(center.lastChecked)).font(.caption).foregroundStyle(.secondary)
+                    if pendingAuto > 0 {
+                        Text("\(pendingAuto) 项将在空闲时自动更新").font(.caption).foregroundStyle(.secondary)
+                    }
+                    lastUpdateLine
                 }
                 Spacer()
                 refreshButton
@@ -89,12 +101,44 @@ struct MenuBarPanel: View {
                     }
                     Text("\(center.items.count) 个条目 · \(XupFormat.lastChecked(center.lastChecked))")
                         .font(.caption).foregroundStyle(.secondary)
+                    lastUpdateLine
                 }
                 Spacer()
                 refreshButton
             }
         }
     }
+
+    /// §18 摘要区第三行："上次更新 HH:mm · 成功 N / 失败 M"（当天统计）；点击打开主窗口的更新历史。
+    @ViewBuilder private var lastUpdateLine: some View {
+        if let last = history.records.last {
+            let stats = UpdateHistory.dayStats(history.records)
+            let isToday = Calendar.current.isDateInToday(last.time)
+            Button {
+                ui.sidebar = .history
+                openMain()
+            } label: {
+                HStack(spacing: 0) {
+                    Text("上次更新 " + (isToday ? Self.hhmm.string(from: last.time) : XupFormat.relative.string(from: last.time)))
+                    if stats.ok + stats.failed > 0 {
+                        Text(" · 成功 \(stats.ok) / ")
+                        Text("失败 \(stats.failed)").foregroundStyle(stats.failed > 0 ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("查看更新历史")
+        }
+    }
+
+    private static let hhmm: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
 
     private var checkingSources: String {
         ProviderKind.sidebarOrder.filter { !center.unavailable.contains($0) && !center.untrackedKinds.contains($0) }.map(\.title).joined(separator: "、")
@@ -121,12 +165,22 @@ struct MenuBarPanel: View {
                         Image(systemName: item.kind.symbol).foregroundStyle(.secondary).frame(width: 16)
                         Text(item.name).lineLimit(1)
                         Spacer()
-                        HStack(spacing: 3) {
-                            Text(item.installed)
-                            Text("→")
-                            Text(item.latestText).fontWeight(.medium)
+                        if item.status.isStaged {
+                            // §19.4：待安装行尾是小号"安装并重启"按钮，不显示版本箭头。
+                            Button(item.appPath.map { AppRunningPolicy.isRunning(appPath: $0) } ?? false ? "安装并重启" : "安装") {
+                                ui.update(ids: [item.id], center: center)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.mini)
+                            .disabled(isUpdating || center.isChecking)
+                        } else {
+                            HStack(spacing: 3) {
+                                Text(item.installed)
+                                Text("→")
+                                Text(item.latestText).fontWeight(.medium)
+                            }
+                            .font(.caption).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
                         }
-                        .font(.caption).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
                     }
                     .frame(height: 32)
                     .contentShape(Rectangle())

@@ -12,3 +12,5 @@
 - 2026-11-04 v1.1 立项：electron-updater blockmap 增量下载（见 docs/ROADMAP-v1.1-blockmap.md）；v1 维持整包。
 - 2026-11-04 v1.1 增加：Agent 友好接口（config.json + JSON Schema + `xup` CLI（--json）+ SKILL.md；MCP 可选 v1.2），见 docs/ROADMAP-v1.1-agent-interface.md。
 - 2026-11-04 v1.1 交付（1.1.0）：blockmap 增量下载 + Agent 接口（config.json/schema/热加载、`xup` CLI、SKILL.md）。CLI 目标名 xup-cli、二进制放 Contents/Helpers/xup（避免与 Xup 大小写冲突）。
+- 2026-11-04 新增功能：更新历史（history.jsonl，最多 2000 条；主窗口"更新历史"视图、菜单栏面板摘要、`xup history` CLI）。
+- 2026-11-04 新增需求：每条目可配更新方式——手动（默认）/ 空闲时自动（无键鼠输入 ≥ N 分钟，默认 5）；应用多一个"自动下载，手动重启"（后台下载校验暂存，用户点"安装并重启"才替换；可选子开关：空闲且应用未运行时自动安装）。全局"自动更新"开关改为"新关注条目的默认更新方式"。

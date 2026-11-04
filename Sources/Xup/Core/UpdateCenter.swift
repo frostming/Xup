@@ -7,6 +7,8 @@ final class UpdateCenter: ObservableObject {
     @Published private(set) var items: [UpdateItem] = []
     @Published private(set) var isChecking = false
     @Published private(set) var updatingIDs: Set<String> = []
+    /// §19.4 正在后台下载暂存的应用（不计入"更新中"）。
+    @Published private(set) var stagingIDs: Set<String> = []
     @Published private(set) var log: [LogLine] = []
     @Published private(set) var providerErrors: [ProviderKind: String] = [:]
     /// 本机没有该工具的 provider。
@@ -14,10 +16,13 @@ final class UpdateCenter: ObservableObject {
     @Published private(set) var lastChecked: Date?
 
     let settings: AppSettings
+    /// §18 更新历史：每次 updateOne 成功/失败都追加一条。
+    let history: UpdateHistory
     let brewState = BrewState()
 
-    init(settings: AppSettings) {
+    init(settings: AppSettings, history: UpdateHistory? = nil) {
         self.settings = settings
+        self.history = history ?? UpdateHistory()
         self.lastChecked = settings.lastCheckedAt
     }
 
@@ -58,6 +63,73 @@ final class UpdateCenter: ObservableObject {
         await Shell.warmUp()
         let r = try await AppSources.resolve(source)
         return (r.latest, r.downloadURL)
+    }
+
+    // MARK: - 暂存（§19.4）
+
+    /// 后台预下载：对策略为 autoDownload 的应用条目下载、校验并暂存，不替换、不退出应用。
+    /// 成功后条目进入 `.staged(latest)`；失败记日志并把 hint 设为失败原因（状态仍为可更新）。返回成功暂存的 id。
+    @discardableResult
+    func stage(ids: Set<String>) async -> Set<String> {
+        let targets = items.filter { ids.contains($0.id) && $0.kind == .app && $0.status.isOutdated && $0.canUpdate && !stagingIDs.contains($0.id) && !updatingIDs.contains($0.id) }
+        guard !targets.isEmpty else { return [] }
+        await Shell.warmUp()
+        guard let provider = makeProviders().compactMap({ $0 as? AppsProvider }).first else { return [] }
+        let log = logger(for: .app)
+        var done: Set<String> = []
+        for item in targets {
+            stagingIDs.insert(item.id)
+            defer { stagingIDs.remove(item.id) }
+            do {
+                let pkg = try await provider.stage(item, log: log)
+                if let idx = items.firstIndex(where: { $0.id == item.id }), items[idx].status.isOutdated {
+                    items[idx].status = .staged(pkg.version)
+                    items[idx].hint = nil
+                }
+                done.insert(item.id)
+            } catch {
+                appendLog(source: ProviderKind.app.title, text: "\(item.name) 预下载失败：\(error.localizedDescription)", isError: true)
+                if let idx = items.firstIndex(where: { $0.id == item.id }) {
+                    items[idx].hint = "预下载失败：\(error.localizedDescription)"
+                }
+            }
+        }
+        return done
+    }
+
+    /// 已下载待安装的条目数。
+    var stagedCount: Int { items.filter { $0.status.isStaged }.count }
+    var stagedItems: [UpdateItem] { items.filter { $0.status.isStaged } }
+
+    /// 策略改动后的收尾：不再是 autoDownload 的应用清掉暂存、状态回到"可更新"。
+    /// 由界面 `setPolicy` 与 config.json 热加载两条路径共同调用。
+    func reconcileStaging() {
+        for app in settings.managedApps {
+            let id = app.itemID
+            let idx = items.firstIndex { $0.id == id }
+            let policy = idx.map { settings.policy(for: items[$0]) } ?? settings.policy(for: id)
+            guard policy != .autoDownload else { continue }
+            let hadStaged = idx.map { items[$0].status.isStaged } ?? false
+            if hadStaged || StagingStore.load(bundleID: AppsProvider.facts(for: app)?.bundleID, destination: app.path) != nil {
+                AppsProvider.clearStaged(for: app)
+                appendLog(source: ProviderKind.app.title, text: "\(app.name) 不再是“自动下载”，已清理暂存")
+            }
+            if hadStaged, let idx { items[idx].status = .outdated }
+        }
+    }
+
+    /// 界面 / 控制通道改策略：写配置 + 收尾。返回生效后的策略（可能被降级）。
+    func setPolicy(_ policy: UpdatePolicy, for ids: Set<String>) {
+        for id in ids { settings.setPolicy(policy, for: id) }
+        reconcileStaging()
+        appendLog(source: "Xup", text: "已将 \(ids.count) 项设为“\(policy.title)”")
+    }
+
+    /// 清空全部暂存（设置 › 通用 "清除"）。
+    func clearAllStaged() {
+        StagingStore.clearAll()
+        for i in items.indices where items[i].status.isStaged { items[i].status = .outdated }
+        appendLog(source: ProviderKind.app.title, text: "已清除全部已下载待安装的更新")
     }
 
     /// 启动或置前应用（"自更新"条目的"启动应用"按钮）。
@@ -172,7 +244,7 @@ final class UpdateCenter: ObservableObject {
         let now = Date()
         lastChecked = now
         settings.lastCheckedAt = now
-        appendLog(source: "Xup", text: "检查完成：\(outdatedCount) 个可更新")
+        appendLog(source: "Xup", text: "检查完成：\(outdatedCount) 个可更新" + (stagedCount > 0 ? "，\(stagedCount) 个待安装" : ""))
         return true
     }
 
@@ -191,7 +263,8 @@ final class UpdateCenter: ObservableObject {
 
     // MARK: - 更新
 
-    func update(ids: Set<String>) async {
+    /// `trigger` 记入更新历史：界面 .manual（默认）、控制通道 .cli、Scheduler .scheduled / .auto。
+    func update(ids: Set<String>, trigger: Trigger = .manual) async {
         let targets = items.filter { ids.contains($0.id) && $0.canUpdate }
         guard !targets.isEmpty else { return }
         await Shell.warmUp()
@@ -206,30 +279,39 @@ final class UpdateCenter: ObservableObject {
                     // 同一 kind 内串行
                     for item in kindItems {
                         guard let self else { return }
-                        await self.updateOne(item, provider: provider, log: log)
+                        await self.updateOne(item, provider: provider, log: log, trigger: trigger)
                     }
                 }
             }
         }
     }
 
-    private func updateOne(_ item: UpdateItem, provider: UpdateProvider, log: @escaping Logger) async {
+    private func updateOne(_ item: UpdateItem, provider: UpdateProvider, log: @escaping Logger, trigger: Trigger) async {
         setStatus(item.id, .updating)
         updatingIDs.insert(item.id)
-        appendLog(source: item.kind.title, text: "开始更新 \(item.name) \(item.installed) → \(item.latest ?? "?")")
+        appendLog(source: item.kind.title, text: (item.status.isStaged ? "安装已下载的 " : "开始更新 ") + "\(item.name) \(item.installed) → \(item.latest ?? "?")")
+        let started = Date()
         defer { updatingIDs.remove(item.id) }
+        var record = UpdateRecord(time: started, kind: item.kind, itemID: item.id, name: item.name, detail: item.detail,
+                                  fromVersion: item.installed, toVersion: nil, duration: 0, ok: false, error: nil, trigger: trigger)
         do {
             try await provider.update(item, log: log)
             if let idx = items.firstIndex(where: { $0.id == item.id }) {
                 items[idx].status = .updated
                 if let latest = items[idx].latest { items[idx].installed = latest }
             }
+            record.ok = true
+            record.toVersion = item.latest
             appendLog(source: item.kind.title, text: "\(item.name) 更新完成")
         } catch {
             let msg = error.localizedDescription
+            record.error = msg
             setStatus(item.id, .failed(msg))
             appendLog(source: item.kind.title, text: "\(item.name) 更新失败：\(msg)", isError: true)
         }
+        record.duration = Date().timeIntervalSince(started)
+        history.append(record)
+        if let err = history.lastError { appendLog(source: "Xup", text: err, isError: true) }
     }
 
     private func setStatus(_ id: String, _ status: ItemStatus) {
@@ -237,8 +319,8 @@ final class UpdateCenter: ObservableObject {
         items[idx].status = status
     }
 
-    func updateAll() async {
-        await update(ids: Set(actionableItems.map(\.id)))
+    func updateAll(trigger: Trigger = .manual) async {
+        await update(ids: Set(actionableItems.map(\.id)), trigger: trigger)
     }
 
     // MARK: - 查询
@@ -251,12 +333,13 @@ final class UpdateCenter: ObservableObject {
         items.filter { $0.kind == kind && $0.isActionable }.count
     }
 
-    /// nil 表示全部；根据 showUpToDate 过滤；可更新在前，其次按名称排序。
+    /// nil 表示全部；根据 showUpToDate 过滤；待安装 → 可更新 在前，其次按名称排序。
     func items(for kind: ProviderKind?) -> [UpdateItem] {
         var list = items
         if let kind { list = list.filter { $0.kind == kind } }
         if !settings.showUpToDate { list = list.filter { $0.status != .upToDate } }
         return list.sorted { a, b in
+            if a.status.isStaged != b.status.isStaged { return a.status.isStaged }
             if a.isActionable != b.isActionable { return a.isActionable }
             if a.status.isOutdated != b.status.isOutdated { return a.status.isOutdated }
             let c = a.name.localizedCaseInsensitiveCompare(b.name)

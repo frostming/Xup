@@ -75,3 +75,16 @@
 - 复现实验：Alma 被 `terminate()` 优雅退出后，LaunchServices 立刻残留其注册（lsappinfo 显示已死 pid）。此时 `open -a`、`NSWorkspace.open(url)`、`openApplication(createsNewApplicationInstance:)` 全部让新进程在 100 ms 内以 0 退出；而 Finder 的打开（`tell application "Finder" to open POSIX file`）能成功，且系统日志出现 `kLSNotifyApplicationExitedIncludingSubordinateProcesses` 清掉旧 ASN。
 - 推断：Alma 退出时留下过继给 launchd 的子进程（chrome_crashpad_handler、lark-cli），LS 把它们算作"subordinate processes"，认为应用仍在运行。
 - 修复：重启在 openApplication 失败后改走 Finder 打开路径；替换前额外清理可执行文件位于该 .app 内的所有遗留进程（不限于 NSRunningApplication）。
+
+## L. 更新历史（2026-11-04 13:50 验收）
+- [x] history.jsonl 追加/截断/筛选；9 个单元测试；总计 35 个测试通过
+- [x] 主窗口"记录 › 更新历史"按天分组视图（截图 design/screenshot-history.png）；菜单栏面板"上次更新 · 成功/失败"
+- [x] `xup history` / `--failed` / `--kind` / `--json` / `history clear --yes`
+- 已安装到 /Applications 并重启；真实记录将在下一次更新后出现
+
+## M. 每条目更新方式（2026-11-04 14:26 验收）
+- [x] 策略模型/配置迁移（check.autoUpdate → defaultPolicy）、空闲判定、调度（待空闲集合不累积、每 5 分钟复查）、暂存安装；39 个测试通过
+- [x] 真实验证：magpie 策略"自动下载，手动重启"→ 后台下载暂存 0.1.2902（69 MB），列表显示"已下载 0.1.2902 · 待安装"+"安装并重启"，应用未被退出；暂存版本与最新不一致时自动失效并重下
+- [x] 界面：状态徽标、策略胶囊、右键"更新方式"子菜单、应用配置 Sheet「更新方式」分组、设置 › 通用 默认策略 + 空闲阈值 + 待安装清除、设置 › 软件 策略标签、菜单栏面板待安装置顶
+- [x] CLI：xup policy list/get/set、xup stage、status/items 含 policy 与 staged
+- 当前机器：PopClip、magpie 为"自动下载"；其余手动；默认手动、空闲 5 分钟

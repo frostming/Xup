@@ -57,12 +57,25 @@ struct AppSourceSheet: View {
     @State private var testTask: Task<Void, Never>?
     /// §17 应用正在运行时的处理方式（映射 `restartAfterUpdate`）。
     @State private var policy: AppRunningPolicy = .relaunch
+    /// §19.3 更新方式 + 子开关。
+    @State private var updatePolicy: UpdatePolicy = .manual
+    @State private var installWhenIdle = false
 
     private var item: UpdateItem? { center.items.first { $0.id == "app:\(app.path)" } }
     private var installed: String { item?.installed ?? "?" }
     private var hasExisting: Bool { app.source != nil }
     private var selfUpdating: Bool { item?.isSelfUpdating ?? false }
-    private var policyChanged: Bool { policy.restartAfterUpdate != app.restartAfterUpdate }
+    /// 来源是否支持预下载（自动识别结果或已配置来源）。
+    private var supportsStaging: Bool {
+        if hasExisting { return true }  // 四类手动来源都由 Xup 下载替换
+        return item?.supportsStaging ?? false
+    }
+    private var storedUpdatePolicy: UpdatePolicy { item.map { settings.policy(for: $0) } ?? settings.policy(for: app.itemID) }
+    private var policyChanged: Bool {
+        policy.restartAfterUpdate != app.restartAfterUpdate
+            || updatePolicy != storedUpdatePolicy
+            || installWhenIdle != app.installWhenIdle
+    }
     /// 用户是否填写过来源字段（或本来就有配置）；没有的话"保存"只写策略。
     private var sourceTouched: Bool {
         hasExisting || !repo.trimmingCharacters(in: .whitespaces).isEmpty
@@ -142,6 +155,37 @@ struct AppSourceSheet: View {
             header
             Divider()
             Form {
+                // §19.3 更新方式（先决定"要不要自动"，再决定"运行中怎么办"）
+                LabeledContent("更新方式") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Picker("", selection: $updatePolicy) {
+                            ForEach(UpdatePolicy.allCases) { p in
+                                Text(p.title).tag(p)
+                            }
+                        }
+                        .pickerStyle(.radioGroup)
+                        .labelsHidden()
+                        .disabled(selfUpdating)
+                        .onChange(of: updatePolicy) { _, p in
+                            if p == .autoDownload, !supportsStaging { updatePolicy = storedUpdatePolicy == .autoDownload ? .auto : storedUpdatePolicy }
+                        }
+                        Text(selfUpdating ? "由应用自更新，Xup 不替它更新，此项无效。" : updatePolicy.explanation)
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !supportsStaging, !selfUpdating {
+                            Text("该应用由 \(stagingBlockedBy) 执行安装，不支持预下载。")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Toggle("空闲且应用未运行时自动安装", isOn: $installWhenIdle)
+                            .disabled(updatePolicy != .autoDownload || selfUpdating)
+                            .padding(.leading, 20)
+                            .help("暂存完成的包会在系统空闲且该应用没有在运行时自动完成安装；应用在运行就继续等你点“安装并重启”。")
+                    }
+                }
+
+                Divider().padding(.vertical, 4)
+
                 // §17 应用正在运行时
                 LabeledContent("应用正在运行时") {
                     Picker("", selection: $policy) {
@@ -185,6 +229,7 @@ struct AppSourceSheet: View {
             footer
         }
         .frame(width: 440)
+        .background(WindowSnapshotHook("sheet", delay: 3))
         .onAppear(perform: load)
         .onDisappear { testTask?.cancel() }
     }
@@ -209,6 +254,16 @@ struct AppSourceSheet: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.bar)
+    }
+
+    /// "自动下载"不可用时的原因。
+    private var stagingBlockedBy: String {
+        let tag = appSourceTag(detail: item?.detail)
+        switch tag {
+        case "Homebrew cask": return "Homebrew"
+        case "App Store": return "App Store"
+        default: return "应用自身"
+        }
     }
 
     /// 自动识别结果：当前无手动配置时直接来自列表 detail；已有配置时核心层不再暴露识别结果。
@@ -405,6 +460,8 @@ struct AppSourceSheet: View {
 
     private func load() {
         policy = AppRunningPolicy(restartAfterUpdate: app.restartAfterUpdate)
+        updatePolicy = storedUpdatePolicy
+        installWhenIdle = app.installWhenIdle
         switch app.source {
         case .githubReleases(let r, let p):
             type = .github; repo = r; assetPattern = p ?? ""
@@ -437,10 +494,12 @@ struct AppSourceSheet: View {
         }
     }
 
-    /// 同时写入运行时策略与来源；来源字段没动过时只保存策略（不触发重新检查）。
+    /// 同时写入更新方式、运行时策略与来源；来源字段没动过时只保存策略（不触发重新检查）。
     private func save() {
         testTask?.cancel()
-        if policyChanged { settings.setRestart(path: app.path, policy.restartAfterUpdate) }
+        if policy.restartAfterUpdate != app.restartAfterUpdate { settings.setRestart(path: app.path, policy.restartAfterUpdate) }
+        if installWhenIdle != app.installWhenIdle { settings.setInstallWhenIdle(path: app.path, installWhenIdle) }
+        if updatePolicy != storedUpdatePolicy { center.setPolicy(updatePolicy, for: [app.itemID]) }
         if sourceTouched {
             guard let source = builtSource else { return }
             let changed = source != app.source

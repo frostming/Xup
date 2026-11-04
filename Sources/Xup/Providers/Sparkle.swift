@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 struct AppcastItem {
@@ -92,11 +93,27 @@ enum AppInstaller {
     /// 调用方用它来退出应用或在应用仍在运行时中止；抛错即取消替换。
     /// `download` 可自定义获取安装包的方式（如 blockmap 增量下载），返回本地文件 URL；该文件归 AppInstaller 所有（会被移走/删除）。
     /// 为 nil 时用 URLSession 整包下载。
+    ///
+    /// 实现为 `prepare`（暂存到临时目录）+ `apply`（替换）；行为与拆分前一致。
     static func install(from url: URL, into destination: String, expectedBundleID: String?, log: @escaping Logger,
                         beforeReplace: (@Sendable () async throws -> Void)? = nil,
                         download: ((URL, @escaping Logger) async throws -> URL)? = nil) async throws {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("xup-\(UUID().uuidString)")
+        try fm.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: work) }
+        let staged = try await prepare(from: url, into: destination, expectedBundleID: expectedBundleID,
+                                       stagingDir: work, download: download, log: log)
+        try await apply(staged: staged, beforeReplace: beforeReplace, log: log)
+    }
+
+    /// §19.4 暂存：下载 → 解压/挂载 → 找 .app → 校验签名 → 复制到 `stagingDir/<App>.app`，**不替换、不退出应用**。
+    /// 返回的 `StagedPackage` 交给 `apply` 完成替换，或由 `StagingStore.save` 持久化为"已下载待安装"。
+    static func prepare(from url: URL, into destination: String, expectedBundleID: String?, stagingDir: URL,
+                        download: ((URL, @escaping Logger) async throws -> URL)? = nil,
+                        log: @escaping Logger) async throws -> StagedPackage {
+        let fm = FileManager.default
+        let work = fm.temporaryDirectory.appendingPathComponent("xup-prep-\(UUID().uuidString)")
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
 
@@ -123,6 +140,8 @@ enum AppInstaller {
         }
         let archive = work.appendingPathComponent("payload.\(ext.isEmpty ? "bin" : ext)")
         try fm.moveItem(at: tmp, to: archive)
+        let archiveSize = (try? fm.attributesOfItem(atPath: archive.path)[.size] as? Int64)
+        let sha256 = try? sha256Hex(of: archive)
 
         let extracted = work.appendingPathComponent("extracted")
         try fm.createDirectory(at: extracted, withIntermediateDirectories: true)
@@ -152,7 +171,8 @@ enum AppInstaller {
         guard let newApp = findApp(in: searchRoot, bundleID: expectedBundleID) else {
             throw NSError(domain: "Xup", code: 3, userInfo: [NSLocalizedDescriptionKey: "安装包里没找到 .app"])
         }
-        if let expected = expectedBundleID, let got = Bundle(url: newApp)?.bundleIdentifier, got != expected {
+        let gotBundleID = StagingStore.bundleIdentifier(at: newApp)
+        if let expected = expectedBundleID, let got = gotBundleID, got != expected {
             throw NSError(domain: "Xup", code: 4, userInfo: [NSLocalizedDescriptionKey: "bundle id 不匹配: \(got) ≠ \(expected)"])
         }
 
@@ -163,24 +183,54 @@ enum AppInstaller {
 
         log("暂存新版本", false)
         let dest = URL(fileURLWithPath: destination)
-        let staged = work.appendingPathComponent(dest.lastPathComponent)
+        try fm.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+        let staged = stagingDir.appendingPathComponent(dest.lastPathComponent)
+        try? fm.removeItem(at: staged)
         try await Shell.runChecked(["/usr/bin/ditto", newApp.path, staged.path], timeout: 300)
         if gate.ok { _ = try? await Shell.run(["/usr/bin/xattr", "-dr", "com.apple.quarantine", staged.path], timeout: 60) }
         else { log("Gatekeeper 评估未通过，保留 quarantine 属性（首次打开会提示）", true) }
 
+        let plist = (try? PropertyListSerialization.propertyList(from: Data(contentsOf: staged.appendingPathComponent("Contents/Info.plist")), format: nil)) as? [String: Any]
+        let version = plist?["CFBundleShortVersionString"] as? String ?? plist?["CFBundleVersion"] as? String ?? "?"
+        return StagedPackage(appPath: staged.path, destination: destination, version: version,
+                             build: plist?["CFBundleVersion"] as? String, bundleID: gotBundleID ?? expectedBundleID,
+                             sourceURL: url.absoluteString, sha256: sha256, archiveSize: archiveSize, stagedAt: Date())
+    }
+
+    /// 替换：`beforeReplace`（退出应用 / 中止）→ 替换 `staged.destination`，直接替换失败时请求管理员权限。
+    static func apply(staged: StagedPackage, beforeReplace: (@Sendable () async throws -> Void)? = nil,
+                      log: @escaping Logger) async throws {
+        let dest = URL(fileURLWithPath: staged.destination)
+        let src = staged.appURL
+        guard FileManager.default.fileExists(atPath: src.appendingPathComponent("Contents/Info.plist").path) else {
+            throw NSError(domain: "Xup", code: 6, userInfo: [NSLocalizedDescriptionKey: "暂存文件已不存在：\(src.path)"])
+        }
         // 一切就绪，替换前最后一步：交给调用方确认 / 退出应用。抛错则不替换。
         if let beforeReplace { try await beforeReplace() }
 
-        log("替换 \(destination)", false)
+        log("替换 \(staged.destination)", false)
         let rpStart = Date()
         do {
-            try replace(dest: dest, with: staged)
+            try replace(dest: dest, with: src)
         } catch {
             log("直接替换失败（\(error.localizedDescription)），请求管理员权限", true)
             let q = { (s: String) in "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-            try await Shell.runPrivileged("rm -rf \(q(dest.path)) && /usr/bin/ditto \(q(staged.path)) \(q(dest.path))")
+            try await Shell.runPrivileged("rm -rf \(q(dest.path)) && /usr/bin/ditto \(q(src.path)) \(q(dest.path))")
         }
         log("替换完成，用时 \(fmt(Date().timeIntervalSince(rpStart)))", false)
+    }
+
+    /// 流式计算文件 SHA-256（十六进制）。
+    static func sha256Hex(of url: URL) throws -> String {
+        let h = try FileHandle(forReadingFrom: url)
+        defer { try? h.close() }
+        var hasher = SHA256()
+        while true {
+            let chunk = try h.read(upToCount: 4 << 20) ?? Data()
+            if chunk.isEmpty { break }
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     private static func fmt(_ t: TimeInterval) -> String {

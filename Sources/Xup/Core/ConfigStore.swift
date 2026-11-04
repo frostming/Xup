@@ -10,7 +10,34 @@ struct XupConfig: Codable, Equatable {
     struct Check: Codable, Equatable {
         var intervalMinutes: Int = 360
         var notify: Bool = true
-        var autoUpdate: Bool = false
+        /// §19.5 新关注条目的默认更新方式；只允许 manual / auto。
+        var defaultPolicy: UpdatePolicy = .manual
+        /// §19.2 空闲判定：无键鼠输入多少分钟视为空闲（1–60）。
+        var idleMinutes: Int = 5
+        /// 旧字段 `autoUpdate`（已废弃）：解码时暂存，供 `XupConfig.init(from:)` 迁移为 defaultPolicy / policies；不写出。
+        var legacyAutoUpdate: Bool? = nil
+
+        private enum CodingKeys: String, CodingKey { case intervalMinutes, notify, defaultPolicy, idleMinutes, autoUpdate }
+
+        init() {}
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            intervalMinutes = try c.decodeIfPresent(Int.self, forKey: .intervalMinutes) ?? 360
+            notify = try c.decodeIfPresent(Bool.self, forKey: .notify) ?? true
+            let policy = try c.decodeIfPresent(UpdatePolicy.self, forKey: .defaultPolicy) ?? .manual
+            defaultPolicy = policy == .autoDownload ? .auto : policy
+            idleMinutes = min(60, max(1, try c.decodeIfPresent(Int.self, forKey: .idleMinutes) ?? 5))
+            legacyAutoUpdate = try c.decodeIfPresent(Bool.self, forKey: .autoUpdate)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(intervalMinutes, forKey: .intervalMinutes)
+            try c.encode(notify, forKey: .notify)
+            try c.encode(defaultPolicy, forKey: .defaultPolicy)
+            try c.encode(idleMinutes, forKey: .idleMinutes)
+        }
     }
 
     struct Homebrew: Codable, Equatable {
@@ -85,10 +112,16 @@ struct XupConfig: Codable, Equatable {
     var agent = Agent()
     var tracked = Tracked()
     var apps: [ManagedApp] = []
+    /// §19.7 每条目的更新方式：键为 UpdateItem.id（`homebrew:formula/node`、`app:/Applications/IINA.app`…，
+    /// homebrew 也接受不带 formula/cask 的 `homebrew:node`）；缺省条目取 `check.defaultPolicy`。
+    var policies: [String: UpdatePolicy] = [:]
+
+    /// 本次解码是否从旧字段 `check.autoUpdate` 做了迁移（ConfigStore 据此回写文件以删除旧键）。
+    var migratedLegacyAutoUpdate = false
 
     private enum CodingKeys: String, CodingKey {
         case schema = "$schema"
-        case version, check, homebrew, ui, electron, agent, tracked, apps
+        case version, check, homebrew, ui, electron, agent, tracked, apps, policies
     }
 
     init() {}
@@ -105,6 +138,28 @@ struct XupConfig: Codable, Equatable {
         agent = try c.decodeIfPresent(Agent.self, forKey: .agent) ?? Agent()
         tracked = try c.decodeIfPresent(Tracked.self, forKey: .tracked) ?? Tracked()
         apps = try c.decodeIfPresent([ManagedApp].self, forKey: .apps) ?? []
+        // 非法的策略值（如把 "autoDownload" 写在非应用上）在读取时由 AppSettings.policy(for:) 降级；这里只解析。
+        policies = try c.decodeIfPresent([String: UpdatePolicy].self, forKey: .policies) ?? [:]
+        migrateLegacyAutoUpdate()
+    }
+
+    /// §19.1 迁移：旧 `check.autoUpdate == true` → `defaultPolicy = auto`，并给当时所有已关注条目与应用补 `auto`；
+    /// `false` → 保持 manual。之后旧键不再写出。
+    mutating func migrateLegacyAutoUpdate() {
+        guard let legacy = check.legacyAutoUpdate else { return }
+        check.legacyAutoUpdate = nil
+        migratedLegacyAutoUpdate = true
+        guard legacy else { return }
+        check.defaultPolicy = .auto
+        for kind in ProviderKind.allCases where kind != .app {
+            for name in tracked[kind] {
+                let key = "\(kind.rawValue):\(name)"
+                if policies[key] == nil { policies[key] = .auto }
+            }
+        }
+        for app in apps where policies[app.itemID] == nil {
+            policies[app.itemID] = .auto
+        }
     }
 
     static func encoder() -> JSONEncoder {
@@ -118,15 +173,6 @@ struct XupConfig: Codable, Equatable {
         copy.schema = Self.schemaReference
         copy.version = Self.currentVersion
         return try Self.encoder().encode(copy)
-    }
-}
-
-extension XupConfig.Check {
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        intervalMinutes = try c.decodeIfPresent(Int.self, forKey: .intervalMinutes) ?? 360
-        notify = try c.decodeIfPresent(Bool.self, forKey: .notify) ?? true
-        autoUpdate = try c.decodeIfPresent(Bool.self, forKey: .autoUpdate) ?? false
     }
 }
 
@@ -189,7 +235,7 @@ enum ConfigError: LocalizedError {
 }
 
 /// 覆盖 config.schema.json 用到的 JSON Schema 子集：type / const / enum / properties / required /
-/// additionalProperties / items / minimum / pattern / oneOf / $ref(#/$defs/x)。
+/// additionalProperties（false 或子 schema）/ items / minimum / maximum / pattern / oneOf / $ref(#/$defs/x)。
 /// 未知字段（additionalProperties:false）作为 **警告** 返回，其余不符作为 **错误**。
 struct ConfigSchemaValidator {
     let schema: [String: Any]
@@ -277,6 +323,9 @@ struct ConfigSchemaValidator {
             if let min = (s["minimum"] as? NSNumber)?.doubleValue, n.doubleValue < min {
                 report.errors.append("\(here) 不能小于 \(Int(min))")
             }
+            if let max = (s["maximum"] as? NSNumber)?.doubleValue, n.doubleValue > max {
+                report.errors.append("\(here) 不能大于 \(Int(max))")
+            }
         }
         if let str = value as? String, let pattern = s["pattern"] as? String,
            let re = try? NSRegularExpression(pattern: pattern) {
@@ -293,6 +342,8 @@ struct ConfigSchemaValidator {
                 let child = path.isEmpty ? k : "\(path).\(k)"
                 if let ps = props[k] as? [String: Any] {
                     walk(v, ps, path: child, report: &report)
+                } else if let ap = s["additionalProperties"] as? [String: Any] {
+                    walk(v, ap, path: child, report: &report)
                 } else if let ap = s["additionalProperties"] as? Bool, ap == false {
                     report.warnings.append("未知字段 \(child)（已忽略）")
                 }
@@ -370,12 +421,18 @@ final class ConfigStore {
 
         if let data = try? Data(contentsOf: url) {
             do {
-                let (cfg, warnings) = try Self.parse(data)
+                var (cfg, warnings) = try Self.parse(data)
+                let migrated = cfg.migratedLegacyAutoUpdate
+                cfg.migratedLegacyAutoUpdate = false
                 config = cfg
                 lastWarnings = warnings
                 lastWritten = data
                 warnings.forEach { emit("配置警告：\($0)", false) }
                 emit("已加载 \(displayPath)", false)
+                if migrated {
+                    // 回写以删除旧的 check.autoUpdate 键。
+                    do { try write(cfg) } catch { emit("迁移后写入 \(displayPath) 失败：\(error.localizedDescription)", true) }
+                }
             } catch {
                 lastError = error.localizedDescription
                 emit("\(error.localizedDescription)；已使用默认配置（文件未改动）", true)
@@ -385,6 +442,8 @@ final class ConfigStore {
             var migrated = false
             if let defaults {
                 migrated = Self.migrate(from: defaults, into: &cfg)
+                cfg.migrateLegacyAutoUpdate()
+                cfg.migratedLegacyAutoUpdate = false
             }
             config = cfg
             do {
@@ -421,10 +480,17 @@ final class ConfigStore {
             warnings = report.warnings
         }
         do {
-            let cfg = try JSONDecoder().decode(XupConfig.self, from: data)
+            var cfg = try JSONDecoder().decode(XupConfig.self, from: data)
             if cfg.version > XupConfig.currentVersion {
                 warnings.append("version=\(cfg.version) 高于本版本支持的 \(XupConfig.currentVersion)")
             }
+            if cfg.migratedLegacyAutoUpdate {
+                // 旧键已迁移，不再当作未知字段提示。
+                warnings.removeAll { $0.contains("check.autoUpdate") }
+                warnings.append("check.autoUpdate 已迁移为 check.defaultPolicy=\(cfg.check.defaultPolicy.rawValue) 与 policies（旧键已删除）")
+            }
+            // 校验里 defaultPolicy 只允许 manual/auto；policies 的值由 schema 限定。
+            cfg.check.legacyAutoUpdate = nil
             return (cfg, warnings)
         } catch {
             throw ConfigError.invalid([error.localizedDescription])
@@ -450,7 +516,10 @@ final class ConfigStore {
         var found = false
         if d.object(forKey: LegacyKey.checkIntervalMinutes) != nil { cfg.check.intervalMinutes = d.integer(forKey: LegacyKey.checkIntervalMinutes); found = true }
         if d.object(forKey: LegacyKey.notifyOnUpdates) != nil { cfg.check.notify = d.bool(forKey: LegacyKey.notifyOnUpdates); found = true }
-        if d.object(forKey: LegacyKey.autoUpdate) != nil { cfg.check.autoUpdate = d.bool(forKey: LegacyKey.autoUpdate); found = true }
+        if d.object(forKey: LegacyKey.autoUpdate) != nil {
+            cfg.check.legacyAutoUpdate = d.bool(forKey: LegacyKey.autoUpdate)
+            found = true
+        }
         if d.object(forKey: LegacyKey.brewGreedy) != nil { cfg.homebrew.greedy = d.bool(forKey: LegacyKey.brewGreedy); found = true }
         if d.object(forKey: LegacyKey.showUpToDate) != nil { cfg.ui.showUpToDate = d.bool(forKey: LegacyKey.showUpToDate); found = true }
         if d.object(forKey: LegacyKey.launchAtLogin) != nil { cfg.ui.launchAtLogin = d.bool(forKey: LegacyKey.launchAtLogin); found = true }
@@ -519,12 +588,20 @@ final class ConfigStore {
             return lastError
         }
         do {
-            let (cfg, warnings) = try Self.parse(data)
+            var (cfg, warnings) = try Self.parse(data)
+            let migrated = cfg.migratedLegacyAutoUpdate
+            cfg.migratedLegacyAutoUpdate = false
             lastWritten = data
             lastWarnings = warnings
             lastError = nil
             warnings.forEach { emit("配置警告：\($0)", false) }
-            if cfg != config {
+            if migrated {
+                config = cfg
+                do { try write(cfg) } catch { emit("迁移后写入 \(displayPath) 失败：\(error.localizedDescription)", true) }
+                emit(source == .external ? "检测到 \(displayPath) 被修改，已热加载" : "已重新加载 \(displayPath)", false)
+                onElectronSettings?(cfg.electron.deltaDownload, cfg.electron.keepVersionsPerApp)
+                onChange?(cfg, source)
+            } else if cfg != config {
                 config = cfg
                 emit(source == .external ? "检测到 \(displayPath) 被修改，已热加载" : "已重新加载 \(displayPath)", false)
                 onElectronSettings?(cfg.electron.deltaDownload, cfg.electron.keepVersionsPerApp)
@@ -631,10 +708,18 @@ enum ConfigSchema {
           "default": true,
           "description": "发现更新时发送系统通知。Post a notification when updates are found."
         },
-        "autoUpdate": {
-          "type": "boolean",
-          "default": false,
-          "description": "定时检查发现更新后自动执行更新（可能退出正在使用的应用）。Automatically install updates found by scheduled checks."
+        "defaultPolicy": {
+          "type": "string",
+          "enum": ["manual", "auto"],
+          "default": "manual",
+          "description": "新关注条目的默认更新方式：manual = 只通知、手动更新；auto = 空闲时自动更新。只影响之后新关注的条目；已有条目见 policies。替代旧字段 autoUpdate（true → auto，并为当时的全部条目写入 policies）。Default update policy for newly watched items (replaces autoUpdate)."
+        },
+        "idleMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 5,
+          "description": "空闲判定：无键盘鼠标输入多少分钟后视为空闲（锁屏/屏保直接视为空闲），1–60。Minutes without input before the Mac counts as idle."
         }
       }
     },
@@ -752,6 +837,11 @@ enum ConfigSchema {
             "default": true,
             "description": "应用正在运行时的处理：true = 自动退出并重新打开（默认）；false = 跳过本次更新，等用户关闭后再更新。If the app is running: true = quit it and relaunch after updating (default); false = skip this update until the user quits the app."
           },
+          "installWhenIdle": {
+            "type": "boolean",
+            "default": false,
+            "description": "仅当该应用在 policies 中为 autoDownload 时有意义：已下载暂存的更新在系统空闲且应用未运行时自动安装。Only with policy autoDownload: install the staged update automatically when idle and the app is not running."
+          },
           "source": {
             "description": "手动指定的更新来源；null 或省略表示自动识别（Homebrew cask > Sparkle > electron-updater > App Store）。Manual update source; null = auto-detect.",
             "oneOf": [
@@ -763,6 +853,14 @@ enum ConfigSchema {
             ]
           }
         }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "description": "每条目的更新方式，键为条目 id（homebrew:formula/node、homebrew:cask/iina 或不带前缀的 homebrew:node、npm:typescript、uv:nox、agent:claude、skill:<name>、plugin:claude/<name@mkt>、app:/Applications/Foo.app）；缺省条目取 check.defaultPolicy。autoDownload 只对 Sparkle / electron-updater / 手动配置来源的应用有效，其它读到时按 auto 处理。Per-item update policy keyed by item id.",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["manual", "auto", "autoDownload"]
       }
     }
   },

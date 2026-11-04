@@ -58,6 +58,11 @@
     'link': C('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'),
     'chevron.down': C('<path d="M5 9l7 7 7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'),
     'doc.text': C('<path d="M6 3h8l5 5v13H6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M9 12h7M9 16h7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'),
+    'arrow.down.circle.fill': C(circle+'<path d="M12 17.5l5-5-1.4-1.4L13 13.7V6h-2v7.7L8.4 11.1 7 12.5z" fill="#fff"/>'),
+    'arrow.down.circle.dotted': C('<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2.4 2.6"/><path d="M12 17.5l5-5-1.4-1.4L13 13.7V6h-2v7.7L8.4 11.1 7 12.5z"/>'),
+    'checkmark': C('<path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'),
+    'hand.raised': C('<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V13M17 13v-1.5a1.5 1.5 0 0 1 3 0V15a7 7 0 0 1-7 7h-1.5a6 6 0 0 1-5-2.7L3.6 14.4a1.6 1.6 0 0 1 2.6-1.8L8 15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
+    'moon.zzz': C('<path d="M13.5 3a8.5 8.5 0 1 0 7.5 12.5A7 7 0 0 1 13.5 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 5h4l-4 4h4M18.5 11h2.5l-2.5 2.5H21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'),
     'bell.badge': C('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="6" r="3"/>'),
   };
   document.querySelectorAll('i.sf[data-sf]').forEach(el => {
