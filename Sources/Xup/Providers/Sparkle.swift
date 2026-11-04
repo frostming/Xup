@@ -207,6 +207,10 @@ enum AppInstaller {
         }
         // 一切就绪，替换前最后一步：交给调用方确认 / 退出应用。抛错则不替换。
         if let beforeReplace { try await beforeReplace() }
+        // 退出应用可能耗时十几秒，期间暂存目录可能被其它流程清理；替换前必须再次确认，否则旧版会被白白删掉。
+        guard FileManager.default.fileExists(atPath: src.appendingPathComponent("Contents/Info.plist").path) else {
+            throw NSError(domain: "Xup", code: 6, userInfo: [NSLocalizedDescriptionKey: "替换前发现暂存文件已不存在，已取消（旧版本未动）：\(src.path)"])
+        }
 
         log("替换 \(staged.destination)", false)
         let rpStart = Date()
@@ -215,7 +219,12 @@ enum AppInstaller {
         } catch {
             log("直接替换失败（\(error.localizedDescription)），请求管理员权限", true)
             let q = { (s: String) in "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-            try await Shell.runPrivileged("rm -rf \(q(dest.path)) && /usr/bin/ditto \(q(src.path)) \(q(dest.path))")
+            let old = dest.path + ".xup-old"
+            // 绝不先删旧版：先移开，拷贝成功才删除备份；拷贝失败则把旧版移回。
+            let script = "set -e; [ -d \(q(src.path)) ] || { echo '暂存文件不存在' >&2; exit 2; }; "
+                + "rm -rf \(q(old)); if [ -e \(q(dest.path)) ]; then mv \(q(dest.path)) \(q(old)); fi; "
+                + "if /usr/bin/ditto \(q(src.path)) \(q(dest.path)); then rm -rf \(q(old)); else rm -rf \(q(dest.path)); [ -e \(q(old)) ] && mv \(q(old)) \(q(dest.path)); exit 1; fi"
+            try await Shell.runPrivileged(script)
         }
         log("替换完成，用时 \(fmt(Date().timeIntervalSince(rpStart)))", false)
     }
@@ -245,7 +254,13 @@ enum AppInstaller {
         do {
             try fm.copyItem(at: staged, to: dest)
         } catch {
-            try? fm.moveItem(at: backup, to: dest)
+            try? fm.removeItem(at: dest)
+            do {
+                try fm.moveItem(at: backup, to: dest)
+            } catch let rollback {
+                // 回滚也失败：保留备份并把路径写进错误，绝不丢数据。
+                throw NSError(domain: "Xup", code: 7, userInfo: [NSLocalizedDescriptionKey: "\(error.localizedDescription)；且旧版本未能移回（\(rollback.localizedDescription)），备份仍在 \(backup.path)"])
+            }
             throw error
         }
         try? fm.removeItem(at: backup)

@@ -109,7 +109,16 @@ enum StagingStore {
     }
 
     /// 删除该应用的全部暂存。
+    // MARK: 安装中锁：正在被 apply 的暂存不得被清理/重新暂存（否则替换前文件消失，旧版会被删）。
+    private static let inUseLock = NSLock()
+    nonisolated(unsafe) private static var inUse: Set<String> = []
+
+    static func beginInstall(destination: String) { inUseLock.withLock { _ = inUse.insert(destination) } }
+    static func endInstall(destination: String) { inUseLock.withLock { _ = inUse.remove(destination) } }
+    static func isInstalling(destination: String) -> Bool { inUseLock.withLock { inUse.contains(destination) } }
+
     static func clear(bundleID: String?, destination: String) {
+        guard !isInstalling(destination: destination) else { return }
         try? FileManager.default.removeItem(at: directory(bundleID: bundleID, destination: destination))
     }
 

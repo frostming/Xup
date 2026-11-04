@@ -353,7 +353,10 @@ struct AppsProvider: UpdateProvider {
             return
         }
         log("安装已暂存的 \(item.name) \(pkg.version)（\(pkg.appPath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))）", false)
+        StagingStore.beginInstall(destination: app.path)
+        defer { StagingStore.endInstall(destination: app.path) }
         try await AppInstaller.apply(staged: pkg, beforeReplace: { try await quitIfRunning("替换前检查", true) }, log: log)
+        StagingStore.endInstall(destination: app.path)
         StagingStore.clear(bundleID: f.bundleID, destination: app.path)
     }
 
@@ -372,6 +375,8 @@ struct AppsProvider: UpdateProvider {
         let started = Date()
         log("后台下载 \(f.name) \(item.latest ?? "?")（不替换、不退出应用）", false)
         let dir = StagingStore.directory(bundleID: f.bundleID, destination: app.path, version: item.latest ?? "unknown")
+        // 正在安装已暂存版本时不得重新暂存（会删掉正在用的文件）。
+        guard !StagingStore.isInstalling(destination: app.path) else { throw StageError.unsupported("安装进行中，稍后再预下载") }
         // 旧版本的暂存先清掉（远端出现更高版本 → 丢弃旧暂存）。
         StagingStore.clear(bundleID: f.bundleID, destination: app.path)
         var pkg: StagedPackage
