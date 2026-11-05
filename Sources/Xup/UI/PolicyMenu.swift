@@ -95,12 +95,14 @@ struct PolicyMenuItems: View {
 struct PolicyTag: View {
     let policy: UpdatePolicy
     var installWhenIdle = false
-    @EnvironmentObject private var settings: AppSettings
+    /// 显式传入而非 @EnvironmentObject：PolicyTag 会被渲染在 Table 行 / Menu label 等
+    /// 由 AppKit 单独托管的视图里，macOS 27 上这些位置拿不到环境对象会直接崩溃。
+    let idleMinutes: Int
 
     private var tooltip: String {
         switch policy {
         case .manual: return "手动更新：定时检查只通知，你点“更新”才执行"
-        case .auto: return "空闲时自动更新：无操作 \(settings.idleMinutes) 分钟后自动执行"
+        case .auto: return "空闲时自动更新：无操作 \(idleMinutes) 分钟后自动执行"
         case .autoDownload:
             return "自动下载，手动重启：发现新版本立即后台下载暂存，点“安装并重启”完成"
                 + (installWhenIdle ? " · 空闲且未运行时自动安装" : "")

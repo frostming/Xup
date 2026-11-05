@@ -102,7 +102,8 @@ struct ItemTable: View {
                     // §19.6：只在策略 ≠ 手动时显示，默认态保持安静。
                     let policy = settings.policy(for: item)
                     if policy != .manual, item.canUpdate {
-                        PolicyTag(policy: policy, installWhenIdle: item.appPath.map { settings.installWhenIdle(path: $0) } ?? false)
+                        PolicyTag(policy: policy, installWhenIdle: item.appPath.map { settings.installWhenIdle(path: $0) } ?? false,
+                                  idleMinutes: settings.idleMinutes)
                     }
                 }
                 Text(item.detail ?? " ")

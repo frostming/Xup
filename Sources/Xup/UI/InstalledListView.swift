@@ -224,8 +224,11 @@ struct InstalledListView: View {
                 let target = PolicyTarget(kind: kind, name: entry.name, detail: entry.detail)
                 Menu {
                     PolicyMenuItems(targets: [target])
+                        .environmentObject(center)
+                        .environmentObject(settings)
+                        .environmentObject(ui)
                 } label: {
-                    PolicyTag(policy: settings.policy(for: target.id))
+                    PolicyTag(policy: settings.policy(for: target.id), idleMinutes: settings.idleMinutes)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
