@@ -20,7 +20,19 @@ macOS 菜单栏常驻的统一更新器。只检查、只更新你**关注**（�
 
 **更新方式（每条目）**：每个被关注的条目单独选 `手动更新`（默认）/ `空闲时自动更新`（定时检查发现新版本后等无键鼠输入 N 分钟或锁屏再自动执行）/ 仅应用的 `自动下载，手动重启`（立即后台下载校验并暂存到 `~/Library/Caches/dev.fming.xup/staged/`，列表显示蓝色"已下载 1.5.0 · 待安装"，点"安装并重启"才替换；可选子开关"空闲且应用未运行时自动安装"）。全局只保留"新关注条目的默认更新方式"与"空闲判定"阈值；表格右键"更新方式"、应用配置 Sheet、"添加…"Sheet 已关注行的行尾标签、`xup policy` 都可改。
 
-## 构建与安装
+## 安装
+
+用 Homebrew 安装（同时会把命令行 `xup` 链接到 Homebrew 的 `bin` 目录）：
+
+```sh
+brew install --cask frostming/tap/xup
+```
+
+或者从 [Releases](../../releases) 下载 `Xup-<版本>-arm64.zip`，解压后拖到「应用程序」。
+
+需要 Apple 芯片和 macOS 26 或更高版本。安装包使用 Developer ID 签名并经过 Apple 公证，可以直接打开。
+
+## 从源码构建
 
 要求：macOS 26+（Liquid Glass 风格），Xcode 26+/Swift 6.x。
 
