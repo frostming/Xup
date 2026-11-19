@@ -306,7 +306,7 @@ extension ProviderKind {
         }
     }
 
-    /// 添加 Sheet 加载态显示的命令。
+    /// 添加 Sheet 加载态显示的命令（skill 以 `SkillManager.lockDisplayPath` 为准，取决于所选管理器）。
     var listCommand: String {
         switch self {
         case .homebrew: return "$ brew list --versions"

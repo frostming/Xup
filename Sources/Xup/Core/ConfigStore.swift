@@ -58,6 +58,10 @@ struct XupConfig: Codable, Equatable {
         var allowUpdates: Bool = false
     }
 
+    struct Skill: Codable, Equatable {
+        var manager: SkillManager = .skills
+    }
+
     /// 关注列表（`.app` 不在此处，见 `apps`）。文件里每个来源是排好序的字符串数组。
     struct Tracked: Codable, Equatable {
         var homebrew: [String] = []
@@ -110,6 +114,7 @@ struct XupConfig: Codable, Equatable {
     var ui = UI()
     var electron = Electron()
     var agent = Agent()
+    var skill = Skill()
     var tracked = Tracked()
     var apps: [ManagedApp] = []
     /// §19.7 每条目的更新方式：键为 UpdateItem.id（`homebrew:formula/node`、`app:/Applications/IINA.app`…，
@@ -121,7 +126,7 @@ struct XupConfig: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case schema = "$schema"
-        case version, check, homebrew, ui, electron, agent, tracked, apps, policies
+        case version, check, homebrew, ui, electron, agent, skill, tracked, apps, policies
     }
 
     init() {}
@@ -136,6 +141,7 @@ struct XupConfig: Codable, Equatable {
         ui = try c.decodeIfPresent(UI.self, forKey: .ui) ?? UI()
         electron = try c.decodeIfPresent(Electron.self, forKey: .electron) ?? Electron()
         agent = try c.decodeIfPresent(Agent.self, forKey: .agent) ?? Agent()
+        skill = try c.decodeIfPresent(Skill.self, forKey: .skill) ?? Skill()
         tracked = try c.decodeIfPresent(Tracked.self, forKey: .tracked) ?? Tracked()
         apps = try c.decodeIfPresent([ManagedApp].self, forKey: .apps) ?? []
         // 非法的策略值（如把 "autoDownload" 写在非应用上）在读取时由 AppSettings.policy(for:) 降级；这里只解析。
@@ -203,6 +209,13 @@ extension XupConfig.Agent {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         allowUpdates = try c.decodeIfPresent(Bool.self, forKey: .allowUpdates) ?? false
+    }
+}
+
+extension XupConfig.Skill {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        manager = try c.decodeIfPresent(SkillManager.self, forKey: .manager) ?? .skills
     }
 }
 
@@ -782,6 +795,19 @@ enum ConfigSchema {
         }
       }
     },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Skills 来源设置。Skills provider settings.",
+      "properties": {
+        "manager": {
+          "type": "string",
+          "enum": ["skills", "skm"],
+          "default": "skills",
+          "description": "读取哪个 skill 管理器：skills = Vercel skills CLI（~/.agents/.skill-lock.json，更新用 npx skills update）；skm = skm（~/.config/skm/skills-lock.yaml，按仓库关注：用 skm 的本地克隆 git fetch 后比对该仓库已安装 skill 的目录，更新用 skm update；本地目录和命令生成的 skill 不列出）。Which skill manager to read: skills (Vercel skills CLI) or skm."
+        }
+      }
+    },
     "tracked": {
       "type": "object",
       "additionalProperties": false,
@@ -810,7 +836,7 @@ enum ConfigSchema {
         "skill": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Vercel skills CLI 安装的 skill 名。Skill names from ~/.agents/.skill-lock.json."
+          "description": "skill.manager = skills 时为 skill 名；= skm 时为仓库（GitHub 为 \"owner/repo\"，其它为完整地址），因为 skm 一次更新整个仓库。Skill names (skills CLI) or repos (skm)."
         },
         "plugin": {
           "type": "array",

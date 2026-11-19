@@ -39,6 +39,8 @@
 - [x] 关注列表：只检查/更新用户选择的软件（日志确认未关注来源全部跳过）
 - [x] Skills 来源（Vercel skills CLI，~/.agents/.skill-lock.json）——Sheet 可读取 32 项；检测逻辑已实现，未做真实更新
 - [x] 插件来源（Claude Code 插件 / Codex 插件）——列表解析已验证；Codex 仅检测
+- [x] 2026-11-19 Skills 可切换为 skm——设置 › Skills 切换写入 skill.manager；添加 Sheet 读出 45 项 skm skill；关注 grilling / grill-me 后检查得到 grilling 可更新（09-18 → 10-29）、同仓库的 grill-me 最新；`xup config set skill.manager` 热加载后切回 skills CLI。未做真实 `skm update`
+- [x] 2026-11-19 skm 按仓库关注——添加 Sheet 列出 10 个仓库（各带 skill 名单，不含本地/命令类）；关注 3 个仓库后检查：mattpocock/skills 可更新 · grilling 有新提交，firecrawl/cli、vercel-labs/agent-browser 最新（用户此前已手动更新）。仓库级 `skm update` 未在 Xup 内实测（命令由单元测试覆盖）
 
 ## G. 待查/后续
 - act：首次真机测试中 `brew upgrade --formula act` 后 act 从 Cellar 消失（0.2.96 bottle 已下载但未安装），已手动 `brew install act` 恢复。当时日志未持久化，原因未明；现已把日志写入 ~/Library/Logs/Xup/xup.log，下次复现可查。

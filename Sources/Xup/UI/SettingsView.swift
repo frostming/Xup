@@ -133,6 +133,26 @@ struct GeneralSettings: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
 
+            Section("Skills") {
+                Picker("Skill 管理器", selection: $settings.skillManager) {
+                    ForEach(SkillManager.allCases, id: \.self) { m in
+                        Text(m.title).tag(m)
+                    }
+                }
+                .pickerStyle(.menu)
+                Text(settings.skillManager == .skm
+                     ? "读取 \(SkillManager.skm.lockDisplayPath)，按仓库关注（skm 一次更新整个仓库）：在 skm 的本地克隆里 git fetch，只看该仓库已安装 skill 的目录有没有新提交；本地目录和命令生成的 skill 不列出。更新用 skm update。"
+                     : "读取 \(SkillManager.skills.lockDisplayPath)，用 GitHub API 查该 skill 目录的新提交。更新用 npx skills update。")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            .onChange(of: settings.skillManager) {
+                // 切换后旧管理器的条目立即作废：重新检查 Skills，避免用错误的命令去更新。
+                Task {
+                    await center.waitUntilIdle()
+                    await center.check(kinds: [.skill])
+                }
+            }
+
             Section("显示") {
                 Toggle("显示已是最新的条目", isOn: $settings.showUpToDate)
                 Toggle("登录时启动", isOn: $settings.launchAtLogin)

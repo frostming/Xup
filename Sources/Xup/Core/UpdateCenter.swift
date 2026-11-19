@@ -36,7 +36,7 @@ final class UpdateCenter: ObservableObject {
             UvProvider(),
             AgentProvider(specs: settings.loadAgentSpecs()),
             AppsProvider(apps: settings.managedApps, brewState: brewState, greedy: greedy),
-            SkillsProvider(),
+            settings.skillManager == .skm ? SkmProvider() : SkillsProvider(),
             PluginProvider(),
         ]
     }
@@ -299,6 +299,8 @@ final class UpdateCenter: ObservableObject {
             if let idx = items.firstIndex(where: { $0.id == item.id }) {
                 items[idx].status = .updated
                 if let latest = items[idx].latest { items[idx].installed = latest }
+                // hint 描述的是这次待更新的内容（如 skm 的"grilling 有新提交"），更新后不再成立。
+                items[idx].hint = nil
             }
             record.ok = true
             record.toVersion = item.latest

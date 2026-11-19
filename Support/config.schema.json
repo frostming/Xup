@@ -106,6 +106,19 @@
         }
       }
     },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Skills 来源设置。Skills provider settings.",
+      "properties": {
+        "manager": {
+          "type": "string",
+          "enum": ["skills", "skm"],
+          "default": "skills",
+          "description": "读取哪个 skill 管理器：skills = Vercel skills CLI（~/.agents/.skill-lock.json，更新用 npx skills update）；skm = skm（~/.config/skm/skills-lock.yaml，按仓库关注：用 skm 的本地克隆 git fetch 后比对该仓库已安装 skill 的目录，更新用 skm update；本地目录和命令生成的 skill 不列出）。Which skill manager to read: skills (Vercel skills CLI) or skm."
+        }
+      }
+    },
     "tracked": {
       "type": "object",
       "additionalProperties": false,
@@ -134,7 +147,7 @@
         "skill": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Vercel skills CLI 安装的 skill 名。Skill names from ~/.agents/.skill-lock.json."
+          "description": "skill.manager = skills 时为 skill 名；= skm 时为仓库（GitHub 为 \"owner/repo\"，其它为完整地址），因为 skm 一次更新整个仓库。Skill names (skills CLI) or repos (skm)."
         },
         "plugin": {
           "type": "array",

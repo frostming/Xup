@@ -482,6 +482,20 @@ Xup (MenuBarExtra, .window 样式)
 
 **不可用**：锁文件不存在且 PATH 无 `skills` → 6.3 文案"未检测到 skills CLI / 用 `npx skills add <owner/repo>` 安装第一个 skill 后重新检测。"
 
+#### 14.1.1 切换为 skm（2026-11-19）
+
+设置 › 通用 新增 **Skills** 一节：`Picker("Skill 管理器")`（`.menu`），选项 `skills CLI (npx skills)`（默认）/ `skm`，下方脚注说明各自的检测与更新方式。对应 config `skill.manager`（`skills` | `skm`）。切换后立即重新检查 Skills 来源（外部改 config 也会触发）。`tracked.skill` 只有一份：skills CLI 下存 skill 名，skm 下存仓库键，两者不通用。
+
+skm 后端（`SkmProvider`）**以仓库为单位**：skm 每个仓库只有一份克隆、所有 skill 共用一个 commit，`skm update <name>` 会 pull 整个仓库并重链同仓库全部 skill，按 skill 关注会顺带更新未勾选的 skill。
+
+- **数据**：`~/.config/skm/skills-lock.yaml`（每项 `name`、`repo` / `local_path` / `source_cmd` 三选一、`commit`、`skill_path`、`linked_to`）。repo 的克隆在 `~/.local/share/skm/skills/<host>_<owner>_<repo>`（与 skm 的 `repo_url_to_dirname` 一致）。
+- **仓库键**：GitHub 为 `owner/repo`，其它为完整地址；条目 id `skill:<键>`。
+- **添加 Sheet**：一行一个仓库；名称为仓库键，detail 为该仓库装的 skill（按名称排序、`、`分隔，最多两行，悬停显示全部），版本列为锁定 commit 的短 SHA。`local_path` 与 `source_cmd` 的 skill 不列出，底部计数后加"不含本地目录和命令生成的 skill"。
+- **最新性判定**：在克隆里 `git fetch`（`GIT_TERMINAL_PROMPT=0`），远端 HEAD 取 `origin/HEAD` → `origin/main` → `origin/master`；对仓库里每个已安装 skill 跑 `git log <commit>..<远端 HEAD> -- <skill_path>`，任一非空 → `.outdated`，hint 写明哪些 skill 变了（`grilling 有新提交`、`a、b 等 3 个 skill 有新提交`），显示在状态徽标后；全空 → `.upToDate`。仓库其它目录（README、发版）的提交不算。"本地更新于"为锁定 commit 的日期，"远端提交"为最新一条改动已安装 skill 目录的提交日期；两者同一天时显示短 SHA。
+- **未知**：克隆不存在 / 锁文件缺 commit / fetch 失败 / git 查询失败。
+- **更新命令**：`skm update <该仓库的全部 skill 名>`（skm 按仓库去重，只 pull 一次）；历史只记一条。成功后清掉 hint。
+- **不可用**：锁文件不存在或 PATH 无 `skm`。
+
 ### 14.2 插件（`ProviderKind.plugin`，侧栏"插件"，`puzzlepiece.extension`）
 
 **数据**：

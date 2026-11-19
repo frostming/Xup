@@ -136,6 +136,8 @@ struct InstalledListView: View {
     }
 
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
+    /// skm 按仓库列出，detail 是该仓库装的 skill 名单，允许折成两行。
+    private var listsSkmRepos: Bool { kind == .skill && settings.skillManager == .skm }
     private var isLoaded: Bool { if case .loaded = state { return true } else { return false } }
 
     private var countText: String {
@@ -144,6 +146,7 @@ struct InstalledListView: View {
             s += " · 共 \(entries.count) 项"
             if isSearching { s += "（显示 \(filtered.count) 项）" }
         }
+        if listsSkmRepos { s += " · 不含本地目录和命令生成的 skill" }
         return s
     }
 
@@ -178,7 +181,8 @@ struct InstalledListView: View {
             VStack(spacing: 12) {
                 ProgressView().controlSize(.large)
                 Text("正在读取 \(kind.title) 已安装列表…").font(.callout).foregroundStyle(.secondary)
-                Text(kind.listCommand).font(.system(.caption, design: .monospaced)).foregroundStyle(.tertiary)
+                Text(kind == .skill ? settings.skillManager.lockDisplayPath : kind.listCommand)
+                    .font(.system(.caption, design: .monospaced)).foregroundStyle(.tertiary)
             }
         case .unavailable:
             smallEmpty(symbol: "exclamationmark.triangle", title: "未检测到 \(kind.title)",
@@ -215,7 +219,9 @@ struct InstalledListView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name).lineLimit(1).truncationMode(.middle)
                 if let d = entry.detail, !d.isEmpty {
-                    Text(d).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Text(d).font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(listsSkmRepos ? 2 : 1).truncationMode(listsSkmRepos ? .tail : .middle)
+                        .help(d)
                 }
             }
             Spacer(minLength: 8)
@@ -240,7 +246,8 @@ struct InstalledListView: View {
                 .lineLimit(1)
                 .frame(width: 110, alignment: .trailing)
         }
-        .frame(height: 36)
+        .padding(.vertical, listsSkmRepos ? 4 : 0)
+        .frame(minHeight: 36)
         .contentShape(Rectangle())
         .onTapGesture { set(entry.name, !on) }
         .contextMenu {
