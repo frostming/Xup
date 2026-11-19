@@ -265,7 +265,8 @@ enum AppSources {
         return ranked.min { $0.1 < $1.1 }?.0
     }
 
-    static func resolveGitHub(repo: String, assetPattern: String?) async throws -> Resolved {
+    /// `GET /repos/{owner/repo}/releases/latest`，返回 (去掉 v 前缀的版本号, 原始 JSON)。
+    static func latestGitHubRelease(repo: String) async throws -> (version: String, json: [String: Any]) {
         let r = repo.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard r.split(separator: "/").count == 2, let url = URL(string: "https://api.github.com/repos/\(r)/releases/latest") else {
             throw SourceError.malformed("仓库名（应为 owner/repo）")
@@ -275,13 +276,18 @@ enum AppSources {
         let data = try await fetch(url, accept: "application/vnd.github+json", headers: headers)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw SourceError.malformed("GitHub API 响应") }
         guard let tag = json["tag_name"] as? String, !tag.isEmpty else { throw SourceError.noVersion("GitHub release") }
+        return (stripV(tag), json)
+    }
+
+    static func resolveGitHub(repo: String, assetPattern: String?) async throws -> Resolved {
+        let (version, json) = try await latestGitHubRelease(repo: repo)
         let assets = (json["assets"] as? [[String: Any]] ?? []).compactMap { a -> (String, URL)? in
             guard let n = a["name"] as? String, let u = (a["browser_download_url"] as? String).flatMap(URL.init(string:)) else { return nil }
             return (n, u)
         }
         let chosen = pickGitHubAsset(names: assets.map(\.0), pattern: assetPattern)
         let dl = assets.first { $0.0 == chosen }?.1
-        return Resolved(latest: stripV(tag), downloadURL: dl, hint: dl == nil ? noMacAssetHint : nil)
+        return Resolved(latest: version, downloadURL: dl, hint: dl == nil ? noMacAssetHint : nil)
     }
 
     // MARK: - Tauri

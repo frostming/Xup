@@ -299,7 +299,7 @@ Xup (MenuBarExtra, .window 样式)
 
 ### 7.2 Agents
 
-- 顶部说明 `.callout`：`Xup 内置了 Claude Code、Codex CLI、Gemini CLI、OpenCode、Amp、GitHub Copilot CLI、Cursor Agent 的检测规则。你可以编辑 agents.json 来增删 agent 或修改更新命令。`
+- 顶部说明 `.callout`：`Xup 内置了 Claude Code、Codex CLI、Gemini CLI、OpenCode、Amp、GitHub Copilot CLI、Cursor Agent、Antigravity CLI 的检测规则。你可以编辑 agents.json 来增删 agent 或修改更新命令。`
 - `Table` 只读列表（名称 / 二进制 / npm 包 / 更新命令），行高 28，`.caption` 等宽显示命令；没有更新命令的行显示 `—` 并在 hint 列显示"仅检测版本"。
 - 底部按钮行：`在 Finder 中显示`（`folder`）· `用默认编辑器打开`（`square.and.pencil`）· `重新加载`（`arrow.clockwise`）· 右侧 `恢复默认`（destructive，需确认）。
 - 文件路径以 `.caption .secondary` 等宽显示：`~/Library/Application Support/Xup/agents.json`。

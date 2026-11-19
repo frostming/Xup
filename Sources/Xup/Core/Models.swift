@@ -307,6 +307,8 @@ struct AgentSpec: Codable, Identifiable, Hashable {
     var name: String
     var binary: String
     var npmPackage: String?
+    /// GitHub 仓库（owner/repo）：没有 npmPackage 时，用它的 latest release tag 当最新版本。
+    var githubRepo: String?
     var versionArgs: [String]?
     /// nil = 未填（加载时用内置规则补）；[] = 明确不要更新命令。
     var updateCommand: [String]?
@@ -321,7 +323,19 @@ struct AgentSpec: Codable, Identifiable, Hashable {
         AgentSpec(name: "Amp", binary: "amp", npmPackage: "@sourcegraph/amp", updateCommand: ["amp", "update"]),
         AgentSpec(name: "GitHub Copilot CLI", binary: "copilot", npmPackage: "@github/copilot"),
         AgentSpec(name: "Cursor Agent", binary: "cursor-agent", updateCommand: ["cursor-agent", "update"]),
+        AgentSpec(name: "Antigravity CLI", binary: "agy", githubRepo: "google-antigravity/antigravity-cli", updateCommand: ["agy", "update"]),
     ]
+
+    /// 开始记录"已见过的内置 agent"之前的内置列表。没有记录的旧 agents.json 按这批算已见。
+    static let legacyBuiltinBinaries: Set<String> = ["claude", "codex", "gemini", "opencode", "amp", "copilot", "cursor-agent"]
+
+    /// 用户还没见过、且 agents.json 里没有同名 binary 的内置 agent，加载时追加到文件末尾。
+    /// seen 为 nil 表示旧文件还没有记录。已见过、后来被用户删掉的不会再出现。
+    static func unseenBuiltins(in specs: [AgentSpec], seen: Set<String>?, builtin: [AgentSpec] = AgentSpec.builtin) -> [AgentSpec] {
+        let seen = seen ?? legacyBuiltinBinaries
+        let present = Set(specs.map(\.binary))
+        return builtin.filter { !seen.contains($0.binary) && !present.contains($0.binary) }
+    }
 
     /// agents.json 是首次启动时从内置列表复制的，之后内置规则的修正不会自动进去。
     /// 加载时对内置已有的 binary，用内置值补上用户没填（nil）的字段；用户填了的值不动，
@@ -331,6 +345,7 @@ struct AgentSpec: Codable, Identifiable, Hashable {
             guard let base = builtin.first(where: { $0.binary == spec.binary }) else { return spec }
             var out = spec
             out.npmPackage = spec.npmPackage ?? base.npmPackage
+            out.githubRepo = spec.githubRepo ?? base.githubRepo
             out.versionArgs = spec.versionArgs ?? base.versionArgs
             out.updateCommand = spec.updateCommand ?? base.updateCommand
             return out

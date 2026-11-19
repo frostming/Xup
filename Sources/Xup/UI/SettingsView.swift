@@ -173,16 +173,16 @@ struct GeneralSettings: View {
 
             Section("Agents 检测规则") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(AppSettings.agentSpecsURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    Text(settings.agentSpecsURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1).truncationMode(.middle)
                         .textSelection(.enabled)
                     HStack {
-                        Button { XupActions.revealInFinder(AppSettings.agentSpecsURL.path) } label: {
+                        Button { XupActions.revealInFinder(settings.agentSpecsURL.path) } label: {
                             Label("在 Finder 中显示", systemImage: "folder")
                         }
-                        Button { NSWorkspace.shared.open(AppSettings.agentSpecsURL) } label: {
+                        Button { NSWorkspace.shared.open(settings.agentSpecsURL) } label: {
                             Label("用默认编辑器打开", systemImage: "square.and.pencil")
                         }
                         Button { _ = settings.loadAgentSpecs() } label: {
@@ -195,7 +195,7 @@ struct GeneralSettings: View {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
                             .font(.footnote).foregroundStyle(.red)
                     } else {
-                        Text("内置 Claude Code、Codex、Gemini、OpenCode、Amp、Copilot、Cursor Agent 的检测规则；编辑 agents.json 可增删 agent 或修改更新命令；内置 agent 没写的字段按内置规则补上，updateCommand 写 [] 表示不更新。")
+                        Text("内置 Claude Code、Codex、Gemini、OpenCode、Amp、Copilot、Cursor Agent、Antigravity CLI 的检测规则；编辑 agents.json 可增删 agent 或修改更新命令；内置 agent 没写的字段按内置规则补上，updateCommand 写 [] 表示不更新。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -223,7 +223,7 @@ struct GeneralSettings: View {
         .formStyle(.grouped)
         .alert("恢复默认 agents.json？", isPresented: $confirmResetAgents) {
             Button("恢复默认", role: .destructive) {
-                try? FileManager.default.removeItem(at: AppSettings.agentSpecsURL)
+                try? FileManager.default.removeItem(at: settings.agentSpecsURL)
                 _ = settings.loadAgentSpecs()
             }
             Button("取消", role: .cancel) {}

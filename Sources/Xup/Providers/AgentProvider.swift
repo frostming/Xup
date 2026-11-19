@@ -35,6 +35,24 @@ struct AgentProvider: UpdateProvider {
         return "?"
     }
 
+    /// 最新版本来源：npm 包优先，其次 GitHub release；都没有返回 nil。
+    private func latestSourceName(_ spec: AgentSpec) -> String? {
+        if spec.npmPackage != nil { return "registry" }
+        if spec.githubRepo != nil { return "GitHub release" }
+        return nil
+    }
+
+    private func latestVersion(_ spec: AgentSpec) async throws -> String? {
+        if let pkg = spec.npmPackage {
+            let json = try await Shell.fetchJSON(URL(string: "https://registry.npmjs.org/\(pkg)/latest")!)
+            return (json as? [String: Any])?["version"] as? String
+        }
+        if let repo = spec.githubRepo {
+            return try await AppSources.latestGitHubRelease(repo: repo).version
+        }
+        return nil
+    }
+
     func listInstalled(log: @escaping Logger) async throws -> [InstalledEntry] {
         let native = nativeSpecs()
         return await withTaskGroup(of: InstalledEntry.self) { group in
@@ -84,17 +102,16 @@ struct AgentProvider: UpdateProvider {
         let installed = await installedVersion(spec)
         var latest: String? = nil
         var status: ItemStatus = .unknown("无最新版本来源")
-        if let pkg = spec.npmPackage {
+        if let source = latestSourceName(spec) {
             do {
-                let json = try await Shell.fetchJSON(URL(string: "https://registry.npmjs.org/\(pkg)/latest")!)
-                latest = (json as? [String: Any])?["version"] as? String
+                latest = try await latestVersion(spec)
                 if let latest, installed != "?" {
                     status = VersionCompare.isNewer(latest, than: installed) ? .outdated : .upToDate
                 } else {
                     status = .unknown("无法读取本地版本")
                 }
             } catch {
-                status = .unknown("registry 查询失败: \(error.localizedDescription)")
+                status = .unknown("\(source) 查询失败: \(error.localizedDescription)")
             }
         }
         let canUpdate = spec.hasUpdateCommand
