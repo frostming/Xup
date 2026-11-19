@@ -39,6 +39,7 @@
 - [x] 关注列表：只检查/更新用户选择的软件（日志确认未关注来源全部跳过）
 - [x] Skills 来源（Vercel skills CLI，~/.agents/.skill-lock.json）——Sheet 可读取 32 项；检测逻辑已实现，未做真实更新
 - [x] 插件来源（Claude Code 插件 / Codex 插件）——列表解析已验证；Codex 仅检测
+- [x] 2026-11-19 菜单栏面板点不开（App 以 `open -gj` 启动后处于隐藏状态，AXHidden=1，点击只有 order out）——修复后：`open -gj` 启动、CLI 自动拉起（现为 `open -g`）、运行中被设为隐藏，三种情况 AXHidden 均为 0，AX 按下状态栏项后面板上屏；不抢前台焦点
 
 ## G. 待查/后续
 - act：首次真机测试中 `brew upgrade --formula act` 后 act 从 Cellar 消失（0.2.96 bottle 已下载但未安装），已手动 `brew install act` 恢复。当时日志未持久化，原因未明；现已把日志写入 ~/Library/Logs/Xup/xup.log，下次复现可查。
