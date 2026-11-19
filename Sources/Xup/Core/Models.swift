@@ -308,15 +308,32 @@ struct AgentSpec: Codable, Identifiable, Hashable {
     var binary: String
     var npmPackage: String?
     var versionArgs: [String]?
+    /// nil = 未填（加载时用内置规则补）；[] = 明确不要更新命令。
     var updateCommand: [String]?
+
+    var hasUpdateCommand: Bool { !(updateCommand ?? []).isEmpty }
 
     static let builtin: [AgentSpec] = [
         AgentSpec(name: "Claude Code", binary: "claude", npmPackage: "@anthropic-ai/claude-code", updateCommand: ["claude", "update"]),
-        AgentSpec(name: "Codex CLI", binary: "codex", npmPackage: "@openai/codex"),
+        AgentSpec(name: "Codex CLI", binary: "codex", npmPackage: "@openai/codex", updateCommand: ["codex", "update"]),
         AgentSpec(name: "Gemini CLI", binary: "gemini", npmPackage: "@google/gemini-cli"),
         AgentSpec(name: "OpenCode", binary: "opencode", npmPackage: "opencode-ai", updateCommand: ["opencode", "upgrade"]),
         AgentSpec(name: "Amp", binary: "amp", npmPackage: "@sourcegraph/amp", updateCommand: ["amp", "update"]),
         AgentSpec(name: "GitHub Copilot CLI", binary: "copilot", npmPackage: "@github/copilot"),
         AgentSpec(name: "Cursor Agent", binary: "cursor-agent", updateCommand: ["cursor-agent", "update"]),
     ]
+
+    /// agents.json 是首次启动时从内置列表复制的，之后内置规则的修正不会自动进去。
+    /// 加载时对内置已有的 binary，用内置值补上用户没填（nil）的字段；用户填了的值不动，
+    /// 自定义 agent 原样保留，用户删掉的内置 agent 不加回来。
+    static func fillingFromBuiltin(_ specs: [AgentSpec], builtin: [AgentSpec] = AgentSpec.builtin) -> [AgentSpec] {
+        specs.map { spec in
+            guard let base = builtin.first(where: { $0.binary == spec.binary }) else { return spec }
+            var out = spec
+            out.npmPackage = spec.npmPackage ?? base.npmPackage
+            out.versionArgs = spec.versionArgs ?? base.versionArgs
+            out.updateCommand = spec.updateCommand ?? base.updateCommand
+            return out
+        }
+    }
 }

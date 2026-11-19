@@ -340,7 +340,7 @@ final class AppSettings: ObservableObject {
         do {
             let data = try Data(contentsOf: url)
             let specs = try JSONDecoder().decode([AgentSpec].self, from: data)
-            return specs
+            return AgentSpec.fillingFromBuiltin(specs)
         } catch {
             agentSpecsError = "解析 agents.json 失败，已使用内置列表：\(error.localizedDescription)"
             return AgentSpec.builtin

@@ -195,7 +195,7 @@ struct GeneralSettings: View {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
                             .font(.footnote).foregroundStyle(.red)
                     } else {
-                        Text("内置 Claude Code、Codex、Gemini、OpenCode、Amp、Copilot、Cursor Agent 的检测规则；编辑 agents.json 可增删 agent 或修改更新命令。")
+                        Text("内置 Claude Code、Codex、Gemini、OpenCode、Amp、Copilot、Cursor Agent 的检测规则；编辑 agents.json 可增删 agent 或修改更新命令；内置 agent 没写的字段按内置规则补上，updateCommand 写 [] 表示不更新。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }

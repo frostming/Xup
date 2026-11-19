@@ -10,9 +10,12 @@ struct AgentProvider: UpdateProvider {
 
     static func managedBy(path: String) -> ManagedBy {
         let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
-        if resolved.contains("/Cellar/") || resolved.contains("/Caskroom/") || resolved.contains("/homebrew/") { return .brew }
+        // brew formula 可能把 npm 包装在 Cellar/.../node_modules 下，所以 Cellar/Caskroom 先判；
+        // 但 Homebrew 的 node 装的全局包在 /opt/homebrew/lib/node_modules，归 npm，所以 npm 要在泛匹配 /homebrew/ 之前。
+        if resolved.contains("/Cellar/") || resolved.contains("/Caskroom/") { return .brew }
         if resolved.contains("/node_modules/") || resolved.contains("/.nvm/") || resolved.contains("/.volta/") || resolved.contains("/.fnm/") { return .npm }
         if resolved.contains("/uv/tools/") { return .uv }
+        if resolved.contains("/homebrew/") { return .brew }
         return .native
     }
 
@@ -94,15 +97,15 @@ struct AgentProvider: UpdateProvider {
                 status = .unknown("registry 查询失败: \(error.localizedDescription)")
             }
         }
-        let canUpdate = spec.updateCommand != nil
+        let canUpdate = spec.hasUpdateCommand
         return UpdateItem(kind: .agent, name: spec.name, detail: path.replacingOccurrences(of: Shell.home, with: "~"),
                           installed: installed, latest: latest, status: status, canUpdate: canUpdate,
-                          hint: canUpdate ? nil : "未知安装方式，无更新命令", idSuffix: spec.binary)
+                          hint: canUpdate ? nil : "未配置更新命令，可在 agents.json 中添加 updateCommand", idSuffix: spec.binary)
     }
 
     func update(_ item: UpdateItem, log: @escaping Logger) async throws {
         let binary = item.id.split(separator: ":", maxSplits: 1).last.map(String.init) ?? ""
-        guard let spec = specs.first(where: { $0.binary == binary }), let cmd = spec.updateCommand else {
+        guard let spec = specs.first(where: { $0.binary == binary }), spec.hasUpdateCommand, let cmd = spec.updateCommand else {
             throw ShellError.failed(item.name, 1, "没有配置更新命令")
         }
         log("$ " + cmd.joined(separator: " "), false)

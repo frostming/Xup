@@ -39,6 +39,7 @@
 - [x] 关注列表：只检查/更新用户选择的软件（日志确认未关注来源全部跳过）
 - [x] Skills 来源（Vercel skills CLI，~/.agents/.skill-lock.json）——Sheet 可读取 32 项；检测逻辑已实现，未做真实更新
 - [x] 插件来源（Claude Code 插件 / Codex 插件）——列表解析已验证；Codex 仅检测
+- [x] 2026-11-19 Codex（官方独立安装，~/.codex/packages/standalone）可在 Xup 内更新——此前内置规则缺 updateCommand，显示"未知安装方式"。修复后本机 agents.json 未改动（加载时按内置规则补字段），`xup update agent:codex --wait --yes` 执行 `codex update`，非 TTY 下 16.6 s 完成 0.169.1 → 0.170.0
 
 ## G. 待查/后续
 - act：首次真机测试中 `brew upgrade --formula act` 后 act 从 Cellar 消失（0.2.96 bottle 已下载但未安装），已手动 `brew install act` 恢复。当时日志未持久化，原因未明；现已把日志写入 ~/Library/Logs/Xup/xup.log，下次复现可查。
