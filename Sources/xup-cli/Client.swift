@@ -27,7 +27,8 @@ enum Client {
         return fd
     }
 
-    /// 连接；App 未运行时用 `open -gj` 拉起并等待 socket（最多 10 秒）。
+    /// 连接；App 未运行时用 `open -g` 拉起并等待 socket（最多 10 秒）。
+    /// 不能加 `-j`：它让 App 以隐藏状态启动，菜单栏 App 没有 Dock 图标可以取消隐藏，菜单栏面板会点不开。
     static func connect(autoLaunch: Bool = true) throws -> Int32 {
         if let fd = connectOnce() { return fd }
         guard autoLaunch else { throw CLIError("Xup 未运行（\(Paths.display(Paths.socketPath)) 不可用）") }
@@ -37,7 +38,7 @@ enum Client {
         warn("Xup 未运行，正在启动 \(app)…")
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        p.arguments = ["-gj", app]
+        p.arguments = ["-g", app]
         do { try p.run() } catch { throw CLIError("启动 Xup 失败：\(error.localizedDescription)") }
         p.waitUntilExit()
         guard p.terminationStatus == 0 else { throw CLIError("open \(app) 退出码 \(p.terminationStatus)") }

@@ -2,7 +2,7 @@ import Foundation
 
 // xup —— Xup 的命令行 / agent 接口。
 // 纯配置命令直接读写 ~/Library/Application Support/Xup/config.json；
-// 其余命令通过 Unix socket 调用运行中的 Xup（未运行时自动 `open -gj` 拉起）。
+// 其余命令通过 Unix socket 调用运行中的 Xup（未运行时自动 `open -g` 拉起）。
 // 退出码：0 成功 / 1 失败 / 2 参数错误。
 
 let cliVersion = "0.0.3"

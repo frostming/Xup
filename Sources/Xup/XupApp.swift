@@ -6,12 +6,28 @@ import SwiftUI
 @main
 enum XupMain {
     static func main() {
+        stayUnhidden()
         if #available(macOS 15, *) {
             NSLog("[Xup] entry: macOS 15+ App")
             XupApp15.main()
         } else {
             NSLog("[Xup] entry: macOS 14 App")
             XupApp.main()
+        }
+    }
+
+    /// 菜单栏 App 没有 Dock 图标、不在 ⌘Tab 里，一旦被隐藏（`open -j` 启动、⌘H 等）用户就没法取消隐藏，
+    /// 而隐藏状态下 MenuBarExtra 的面板点了也不显示。所以被隐藏后立即取消隐藏（不激活、不抢焦点）。
+    /// `open -j` 是直接以隐藏状态启动，不发 didHide，所以启动完成时也要检查一次。
+    private static func stayUnhidden() {
+        for name in [NSApplication.didFinishLaunchingNotification, NSApplication.didHideNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { note in
+                MainActor.assumeIsolated {
+                    guard NSApp.isHidden else { return }
+                    NSLog("[Xup] hidden (\(note.name.rawValue)), unhiding so the menu bar panel stays usable")
+                    NSApp.unhideWithoutActivation()
+                }
+            }
         }
     }
 }

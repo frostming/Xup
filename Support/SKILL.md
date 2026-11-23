@@ -11,7 +11,7 @@ Xup 是菜单栏常驻的统一更新器，只检查/更新用户**关注**的�
 - **所有命令支持 `--json`**，agent 应始终加 `--json` 并解析输出。
 - 退出码：`0` 成功 / `1` 失败 / `2` 参数错误。错误信息在 stderr；`--json` 时 stdout 还会有 `{"ok":false,"error":"…"}`。
 - 纯配置命令（`config` / `track` / `apps list|add|remove|set-source`）直接读写 config.json，不需要 App 在运行；运行中的 App 会在 0.5 秒内热加载并自动重新检查。
-- 其余命令通过本机 Unix socket 调用 App；App 未运行时会自动用 `open -gj` 拉起（候选路径：`$XUP_APP_PATH` → CLI 所在的 .app → `/Applications/Xup.app`）。
+- 其余命令通过本机 Unix socket 调用 App；App 未运行时会自动用 `open -g` 拉起（候选路径：`$XUP_APP_PATH` → CLI 所在的 .app → `/Applications/Xup.app`）。
 
 ## 配置文件
 

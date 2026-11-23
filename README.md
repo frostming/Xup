@@ -78,7 +78,7 @@ xup history --tail 20 --failed --json     # 更新历史（时间、from→to、
 xup skill install                         # 安装 SKILL.md 到 ~/.agents/skills/xup 与 ~/.claude/skills/xup
 ```
 
-运行时命令通过 Unix socket `~/Library/Application Support/Xup/control.sock`（0600，每行一个 JSON 请求/响应）调用 App；App 未运行时 CLI 自动 `open -gj` 拉起（`XUP_APP_PATH` 可指定）。条目 id 形如 `homebrew:formula/node`、`homebrew:cask/iina`、`npm:typescript`、`uv:nox`、`agent:claude`、`skill:<name>`、`plugin:claude/<name@mkt>`、`app:/Applications/Foo.app`。完整说明见 `Support/SKILL.md`。
+运行时命令通过 Unix socket `~/Library/Application Support/Xup/control.sock`（0600，每行一个 JSON 请求/响应）调用 App；App 未运行时 CLI 自动 `open -g` 拉起（`XUP_APP_PATH` 可指定）。条目 id 形如 `homebrew:formula/node`、`homebrew:cask/iina`、`npm:typescript`、`uv:nox`、`agent:claude`、`skill:<name>`、`plugin:claude/<name@mkt>`、`app:/Applications/Foo.app`。完整说明见 `Support/SKILL.md`。
 
 ## 排查
 
