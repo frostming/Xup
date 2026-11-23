@@ -111,6 +111,11 @@ final class AppSettings: ObservableObject {
         }
     }
     var agentAllowUpdates: Bool { config.agent.allowUpdates }
+    /// Skills 来源使用的管理器（config `skill.manager`）。
+    var skillManager: SkillManager {
+        get { config.skill.manager }
+        set { mutate { $0.skill.manager = newValue } }
+    }
 
     // MARK: - 登录项
 

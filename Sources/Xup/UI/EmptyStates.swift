@@ -69,6 +69,7 @@ enum EmptyStates {
     struct Unavailable: View {
         let kind: ProviderKind
         let recheck: () -> Void
+        @EnvironmentObject private var settings: AppSettings
         private var tool: String {
             switch kind {
             case .homebrew: return "brew"
@@ -76,7 +77,7 @@ enum EmptyStates {
             case .uv: return "uv"
             case .agent: return "已知的 CLI agent"
             case .app: return "应用"
-            case .skill: return "npx 与 ~/.agents/.skill-lock.json"
+            case .skill: return settings.skillManager.requirement
             case .plugin: return "claude 或 codex"
             }
         }

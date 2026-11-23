@@ -31,6 +31,7 @@ Xup 是菜单栏常驻的统一更新器，只检查/更新用户**关注**的�
   "ui":       { "showUpToDate": false, "launchAtLogin": false },
   "electron": { "deltaDownload": true, "keepVersionsPerApp": 1 },
   "agent":    { "allowUpdates": false },
+  "skill":    { "manager": "skills" },
   "tracked":  { "homebrew": ["node"], "npm": [], "uv": ["nox"], "agent": ["claude"], "skill": [], "plugin": [] },
   "apps": [
     { "path": "/Applications/IINA.app", "restartAfterUpdate": true, "installWhenIdle": false, "source": null },
@@ -53,7 +54,7 @@ Xup 是菜单栏常驻的统一更新器，只检查/更新用户**关注**的�
 | npm | `npm:<pkg>` | 包名，如 `npm:typescript`、`npm:@openai/codex` |
 | uv | `uv:<tool>` | `uv:nox` |
 | agent | `agent:<binary>` | `agent:claude`（agents.json 中的 binary） |
-| skill | `skill:<name>` | `skill:ui-ux-pro-max` |
+| skill | `skill:<name>`（skill.manager = skm 时为 `skill:<owner/repo>`） | `skill:ui-ux-pro-max`、`skill:mattpocock/skills` |
 | plugin | `plugin:claude/<name@marketplace>`、`plugin:codex/<name@marketplace>` | `plugin:claude/nowledge-mem@nowledge-community` |
 | app | `app:/Applications/Foo.app` | 不用 track；用 `xup apps add <path>` |
 
@@ -112,6 +113,7 @@ xup apps probe-source /Applications/Kaze.app "github:owner/kaze#*arm64*.dmg" --j
 xup config get check.intervalMinutes
 xup config set check.intervalMinutes 720
 xup config set homebrew.greedy true
+xup config set skill.manager '"skm"'           # Skills 来源改读 skm（默认 "skills" = Vercel skills CLI）；skm 时按仓库关注，id 为 skill:<owner/repo>
 xup config set apps.0.restartAfterUpdate false   # 应用在运行时：false = 跳过本次更新等用户关闭，true（默认）= 自动退出并重新打开
 ```
 

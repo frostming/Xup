@@ -30,6 +30,36 @@ enum ProviderKind: String, CaseIterable, Codable, Identifiable, Hashable {
     }
 }
 
+/// Skills 来源读取哪个管理器的锁文件（config `skill.manager`）；同一时间只用一个。
+enum SkillManager: String, CaseIterable, Codable, Sendable {
+    /// Vercel `skills` CLI（`npx skills`），锁文件 ~/.agents/.skill-lock.json。
+    case skills
+    /// skm（github.com/reorx/skm），锁文件 ~/.config/skm/skills-lock.yaml。
+    case skm
+
+    var title: String {
+        switch self {
+        case .skills: return "skills CLI (npx skills)"
+        case .skm: return "skm"
+        }
+    }
+
+    var lockDisplayPath: String {
+        switch self {
+        case .skills: return "~/.agents/.skill-lock.json"
+        case .skm: return "~/.config/skm/skills-lock.yaml"
+        }
+    }
+
+    /// 来源不可用时提示缺少的东西。
+    var requirement: String {
+        switch self {
+        case .skills: return "npx 与 ~/.agents/.skill-lock.json"
+        case .skm: return "skm 与 ~/.config/skm/skills-lock.yaml"
+        }
+    }
+}
+
 enum ItemStatus: Equatable, Hashable {
     case checking
     case outdated

@@ -61,6 +61,7 @@ enum ConfigFile {
             "ui": ["showUpToDate": true, "launchAtLogin": false],
             "electron": ["deltaDownload": true, "keepVersionsPerApp": 1],
             "agent": ["allowUpdates": false],
+            "skill": ["manager": "skills"],
             "tracked": Dictionary(uniqueKeysWithValues: kinds.map { ($0, [String]()) }),
             "apps": [[String: Any]](),
             "policies": [String: Any](),

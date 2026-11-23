@@ -32,13 +32,13 @@ final class AppModel: ObservableObject {
             DeltaDownloadPolicy.isEnabled = enabled
             DeltaDownloadPolicy.keepVersionsPerApp = keep
         }
-        // 配置被外部修改（CLI / 编辑器）后，关注列表 / 应用列表 / Homebrew 选项变化时重新检查一次；
+        // 配置被外部修改（CLI / 编辑器）后，关注列表 / 应用列表 / Homebrew 选项 / skill 管理器变化时重新检查一次；
         // 只改间隔、通知等开关不触发检查。
         settings.onExternalChange = { [weak center] old, new, source in
             guard let center, source == .external else { return }
             // 策略变化（CLI `xup policy set`）：不再是 autoDownload 的应用清理暂存。
             if old.policies != new.policies || old.apps != new.apps { center.reconcileStaging() }
-            guard old.tracked != new.tracked || old.apps != new.apps || old.homebrew != new.homebrew else { return }
+            guard old.tracked != new.tracked || old.apps != new.apps || old.homebrew != new.homebrew || old.skill != new.skill else { return }
             Task { @MainActor in
                 await center.waitUntilIdle()
                 await center.checkAll()
