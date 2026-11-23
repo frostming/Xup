@@ -10,9 +10,12 @@ struct AgentProvider: UpdateProvider {
 
     static func managedBy(path: String) -> ManagedBy {
         let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
-        if resolved.contains("/Cellar/") || resolved.contains("/Caskroom/") || resolved.contains("/homebrew/") { return .brew }
+        // brew formula 可能把 npm 包装在 Cellar/.../node_modules 下，所以 Cellar/Caskroom 先判；
+        // 但 Homebrew 的 node 装的全局包在 /opt/homebrew/lib/node_modules，归 npm，所以 npm 要在泛匹配 /homebrew/ 之前。
+        if resolved.contains("/Cellar/") || resolved.contains("/Caskroom/") { return .brew }
         if resolved.contains("/node_modules/") || resolved.contains("/.nvm/") || resolved.contains("/.volta/") || resolved.contains("/.fnm/") { return .npm }
         if resolved.contains("/uv/tools/") { return .uv }
+        if resolved.contains("/homebrew/") { return .brew }
         return .native
     }
 
@@ -30,6 +33,24 @@ struct AgentProvider: UpdateProvider {
             return v
         }
         return "?"
+    }
+
+    /// 最新版本来源：npm 包优先，其次 GitHub release；都没有返回 nil。
+    private func latestSourceName(_ spec: AgentSpec) -> String? {
+        if spec.npmPackage != nil { return "registry" }
+        if spec.githubRepo != nil { return "GitHub release" }
+        return nil
+    }
+
+    private func latestVersion(_ spec: AgentSpec) async throws -> String? {
+        if let pkg = spec.npmPackage {
+            let json = try await Shell.fetchJSON(URL(string: "https://registry.npmjs.org/\(pkg)/latest")!)
+            return (json as? [String: Any])?["version"] as? String
+        }
+        if let repo = spec.githubRepo {
+            return try await AppSources.latestGitHubRelease(repo: repo).version
+        }
+        return nil
     }
 
     func listInstalled(log: @escaping Logger) async throws -> [InstalledEntry] {
@@ -81,28 +102,27 @@ struct AgentProvider: UpdateProvider {
         let installed = await installedVersion(spec)
         var latest: String? = nil
         var status: ItemStatus = .unknown("无最新版本来源")
-        if let pkg = spec.npmPackage {
+        if let source = latestSourceName(spec) {
             do {
-                let json = try await Shell.fetchJSON(URL(string: "https://registry.npmjs.org/\(pkg)/latest")!)
-                latest = (json as? [String: Any])?["version"] as? String
+                latest = try await latestVersion(spec)
                 if let latest, installed != "?" {
                     status = VersionCompare.isNewer(latest, than: installed) ? .outdated : .upToDate
                 } else {
                     status = .unknown("无法读取本地版本")
                 }
             } catch {
-                status = .unknown("registry 查询失败: \(error.localizedDescription)")
+                status = .unknown("\(source) 查询失败: \(error.localizedDescription)")
             }
         }
-        let canUpdate = spec.updateCommand != nil
+        let canUpdate = spec.hasUpdateCommand
         return UpdateItem(kind: .agent, name: spec.name, detail: path.replacingOccurrences(of: Shell.home, with: "~"),
                           installed: installed, latest: latest, status: status, canUpdate: canUpdate,
-                          hint: canUpdate ? nil : "未知安装方式，无更新命令", idSuffix: spec.binary)
+                          hint: canUpdate ? nil : "未配置更新命令，可在 agents.json 中添加 updateCommand", idSuffix: spec.binary)
     }
 
     func update(_ item: UpdateItem, log: @escaping Logger) async throws {
         let binary = item.id.split(separator: ":", maxSplits: 1).last.map(String.init) ?? ""
-        guard let spec = specs.first(where: { $0.binary == binary }), let cmd = spec.updateCommand else {
+        guard let spec = specs.first(where: { $0.binary == binary }), spec.hasUpdateCommand, let cmd = spec.updateCommand else {
             throw ShellError.failed(item.name, 1, "没有配置更新命令")
         }
         log("$ " + cmd.joined(separator: " "), false)

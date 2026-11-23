@@ -39,6 +39,8 @@
 - [x] 关注列表：只检查/更新用户选择的软件（日志确认未关注来源全部跳过）
 - [x] Skills 来源（Vercel skills CLI，~/.agents/.skill-lock.json）——Sheet 可读取 32 项；检测逻辑已实现，未做真实更新
 - [x] 插件来源（Claude Code 插件 / Codex 插件）——列表解析已验证；Codex 仅检测
+- [x] 2026-11-19 Codex（官方独立安装，~/.codex/packages/standalone）可在 Xup 内更新——此前内置规则缺 updateCommand，显示"未知安装方式"。修复后本机 agents.json 未改动（加载时按内置规则补字段），`xup update agent:codex --wait --yes` 执行 `codex update`，非 TTY 下 16.6 s 完成 0.169.1 → 0.170.0
+- [x] 2026-11-19 Antigravity CLI（`agy`，~/.local/bin 原生二进制）——本机 agents.json 还原为旧的 7 项、清掉 `seenBuiltinAgents` 后启动：agy 追加到文件末尾，`seenBuiltinAgents` 记为 8 项；`xup installed agent` 列出 agy 1.5.11；关注后检查得到 1.5.11 → 1.5.12（GitHub release）；`xup update agent:agy --wait --yes` 执行 `agy update`，非 TTY 下 7.8 s 完成，更新历史记一条成功。从文件删掉 agy 后重新加载不再加回（已恢复）。另：此前 `swift test` 会读写真实 agents.json（本次测试先把 agy 写进了真实文件），已改为与 config.json 同目录，测试后真实文件不变
 
 ## G. 待查/后续
 - act：首次真机测试中 `brew upgrade --formula act` 后 act 从 Cellar 消失（0.2.96 bottle 已下载但未安装），已手动 `brew install act` 恢复。当时日志未持久化，原因未明；现已把日志写入 ~/Library/Logs/Xup/xup.log，下次复现可查。

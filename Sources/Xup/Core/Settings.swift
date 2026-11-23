@@ -2,7 +2,7 @@ import Foundation
 import ServiceManagement
 
 /// 设置门面：所有用户配置来自 `ConfigStore`（config.json）；UserDefaults 只保留运行状态
-/// （`lastCheckedAt`）与界面偏好（`hasSeenWatchPicker`、窗口位置等）。
+/// （`lastCheckedAt`、`seenBuiltinAgents`）与界面偏好（`hasSeenWatchPicker`、窗口位置等）。
 @MainActor
 final class AppSettings: ObservableObject {
     private let defaults: UserDefaults
@@ -10,6 +10,7 @@ final class AppSettings: ObservableObject {
 
     private enum Key {
         static let lastCheckedAt = "lastCheckedAt"
+        static let seenBuiltinAgents = "seenBuiltinAgents"
     }
 
     /// 当前配置快照；每次（本地或外部）变化都会整体替换，驱动 SwiftUI 刷新。
@@ -320,30 +321,54 @@ final class AppSettings: ObservableObject {
         return dir
     }
 
-    nonisolated static var agentSpecsURL: URL { supportDirectory.appendingPathComponent("agents.json") }
+    /// agents.json 与 config.json 放在同一目录（测试用临时 config 时也就不会碰真实文件）。
+    var agentSpecsURL: URL { store.url.deletingLastPathComponent().appendingPathComponent("agents.json") }
+
+    /// 已经写进过 agents.json 的内置 agent（binary）；之后新增的内置 agent 据此追加一次。
+    private var seenBuiltinAgents: Set<String>? {
+        get { (defaults.stringArray(forKey: Key.seenBuiltinAgents)).map(Set.init) }
+        set { defaults.set(newValue.map { $0.sorted() }, forKey: Key.seenBuiltinAgents) }
+    }
+
+    private func writeAgentSpecs(_ specs: [AgentSpec]) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try encoder.encode(specs).write(to: agentSpecsURL, options: .atomic)
+    }
 
     /// 读取 agents.json；不存在时写入内置列表并返回；解析失败时返回内置列表并记录错误。
+    /// 用户没见过的新内置 agent 会追加进文件（之后用户删掉也不再加回）。
     func loadAgentSpecs() -> [AgentSpec] {
-        let url = Self.agentSpecsURL
+        let url = agentSpecsURL
+        let allBuiltin = Set(AgentSpec.builtin.map(\.binary))
         agentSpecsError = nil
         if !FileManager.default.fileExists(atPath: url.path) {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             do {
-                let data = try encoder.encode(AgentSpec.builtin)
-                try data.write(to: url, options: .atomic)
+                try writeAgentSpecs(AgentSpec.builtin)
+                seenBuiltinAgents = allBuiltin
             } catch {
                 agentSpecsError = "写入 agents.json 失败：\(error.localizedDescription)"
             }
             return AgentSpec.builtin
         }
+        var specs: [AgentSpec]
         do {
-            let data = try Data(contentsOf: url)
-            let specs = try JSONDecoder().decode([AgentSpec].self, from: data)
-            return specs
+            specs = try JSONDecoder().decode([AgentSpec].self, from: Data(contentsOf: url))
         } catch {
             agentSpecsError = "解析 agents.json 失败，已使用内置列表：\(error.localizedDescription)"
             return AgentSpec.builtin
         }
+        let seen = seenBuiltinAgents
+        let added = AgentSpec.unseenBuiltins(in: specs, seen: seen)
+        do {
+            if !added.isEmpty {
+                specs += added
+                try writeAgentSpecs(specs)
+            }
+            seenBuiltinAgents = (seen ?? AgentSpec.legacyBuiltinBinaries).union(allBuiltin)
+        } catch {
+            agentSpecsError = "向 agents.json 追加新的内置 agent 失败：\(error.localizedDescription)"
+        }
+        return AgentSpec.fillingFromBuiltin(specs)
     }
 }
